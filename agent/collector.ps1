@@ -6,7 +6,7 @@
 # ==============================================================================
 
 # --- Parámetros de Configuración ---
-$API_URL = "http://localhost:3000"  # Cambiar por la URL del servidor Next.js
+$API_URL = "https://mft-inventory.vercel.app"  # Cambiar por la URL del servidor Next.js
 $AGENT_TOKEN = "INGRESA_TU_TOKEN_DE_INQUILINO_AQUI"
 
 # ==============================================================================
