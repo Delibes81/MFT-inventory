@@ -1,0 +1,717 @@
+'use client'
+
+import { useState, useRef } from 'react'
+import { 
+  Monitor, 
+  Cpu, 
+  HardDrive, 
+  Layers, 
+  Search, 
+  User, 
+  ShieldCheck, 
+  FileText, 
+  Activity,
+  X,
+  Key,
+  Copy,
+  Check,
+  Plus,
+  Trash2,
+  Download
+} from 'lucide-react'
+import { generateTenantApiKey, deleteTenantApiKey } from './actions'
+
+interface RAMModule {
+  capacity_gb: number
+  speed_mhz: number
+  part_number: string
+  manufacturer: string
+}
+
+interface RAMDetails {
+  total_gb: number
+  modules: RAMModule[]
+}
+
+interface DiskDrive {
+  drive_letter: string
+  type: string
+  size_gb: number
+  free_space_gb: number
+  used_space_gb: number
+}
+
+interface DiskDetails {
+  total_gb: number
+  drives: DiskDrive[]
+}
+
+export interface Equipo {
+  id: string
+  hostname: string
+  domain: string | null
+  os: string
+  processor: string
+  ram_details: RAMDetails
+  disk_details: DiskDetails
+  last_user: string
+  serial_number: string
+  model: string
+  manufacturer: string
+  antivirus: string | null
+  office_version: string | null
+  updated_at: string
+}
+
+interface TenantDashboardProps {
+  initialEquipos: Equipo[]
+  initialApiKeys: any[]
+  tenantName: string
+}
+
+export default function TenantDashboard({ initialEquipos, initialApiKeys, tenantName }: TenantDashboardProps) {
+  const [equipos] = useState<Equipo[]>(initialEquipos)
+  const [apiKeys] = useState<any[]>(initialApiKeys)
+  const [activeTab, setActiveTab] = useState<'inventory' | 'agent'>('inventory')
+  
+  const [searchQuery, setSearchQuery] = useState('')
+  const [selectedEquipo, setSelectedEquipo] = useState<Equipo | null>(null)
+  
+  // Agent state
+  const [isGeneratingKey, setIsGeneratingKey] = useState(false)
+  const [newKeyName, setNewKeyName] = useState('')
+  const [copiedKeyId, setCopiedKeyId] = useState<string | null>(null)
+  const formRef = useRef<HTMLFormElement>(null)
+
+  // Copy to clipboard helper
+  const handleCopy = (token: string, id: string) => {
+    navigator.clipboard.writeText(token)
+    setCopiedKeyId(id)
+    setTimeout(() => setCopiedKeyId(null), 2000)
+  }
+
+  // Download Agent helper
+  const handleDownloadAgent = async (token: string, tokenName: string) => {
+    try {
+      const res = await fetch('/collector.ps1')
+      if (!res.ok) throw new Error('No se pudo descargar la plantilla.')
+      
+      let text = await res.text()
+      
+      // Inject token and URL
+      text = text.replace('INGRESA_TU_TOKEN_DE_INQUILINO_AQUI', token)
+      const currentUrl = window.location.origin
+      text = text.replace('$API_URL     = "http://localhost:3000/api/collector"', `$API_URL     = "${currentUrl}/api/collector"`)
+      
+      const blob = new Blob([text], { type: 'text/plain' })
+      const url = URL.createObjectURL(blob)
+      
+      const a = document.createElement('a')
+      a.href = url
+      const safeName = tokenName.replace(/[^a-z0-9]/gi, '-').toLowerCase()
+      a.download = `collector-${safeName}.ps1`
+      document.body.appendChild(a)
+      a.click()
+      
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+    } catch (err) {
+      alert('Error descargando el agente. Intenta de nuevo.')
+      console.error(err)
+    }
+  }
+
+  // Filters
+  const filteredEquipos = equipos.filter(e => 
+    e.hostname.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    e.processor.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    e.os.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    e.last_user.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    e.serial_number.toLowerCase().includes(searchQuery.toLowerCase())
+  )
+
+  // Computations
+  const totalComputers = equipos.length
+  
+  const avgRam = totalComputers > 0 
+    ? Math.round(equipos.reduce((acc, e) => acc + (e.ram_details?.total_gb || 0), 0) / totalComputers)
+    : 0
+
+  const totalStorage = totalComputers > 0
+    ? equipos.reduce((acc, e) => acc + (e.disk_details?.total_gb || 0), 0)
+    : 0
+
+  // OS Distribution calculation
+  const osCount: { [key: string]: number } = {}
+  equipos.forEach(e => {
+    let cleanOs = 'Otros'
+    if (e.os.toLowerCase().includes('windows 11')) cleanOs = 'Windows 11'
+    else if (e.os.toLowerCase().includes('windows 10')) cleanOs = 'Windows 10'
+    else if (e.os.toLowerCase().includes('server')) cleanOs = 'Windows Server'
+    else if (e.os.toLowerCase().includes('linux')) cleanOs = 'Linux'
+    else if (e.os.toLowerCase().includes('mac') || e.os.toLowerCase().includes('os x')) cleanOs = 'macOS'
+    
+    osCount[cleanOs] = (osCount[cleanOs] || 0) + 1
+  })
+
+  // RAM Distribution calculation
+  const ramCount: { [key: string]: number } = { '8 GB o menos': 0, '16 GB': 0, '32 GB': 0, '64 GB o más': 0 }
+  equipos.forEach(e => {
+    const total = e.ram_details?.total_gb || 0
+    if (total <= 8) ramCount['8 GB o menos']++
+    else if (total <= 16) ramCount['16 GB']++
+    else if (total <= 32) ramCount['32 GB']++
+    else ramCount['64 GB o más']++
+  })
+
+  return (
+    <div className="space-y-8">
+      {/* Page Header */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-slate-900 pb-6">
+        <div>
+          <span className="text-xs font-semibold text-violet-400 uppercase tracking-wider block">Panel de Inquilino</span>
+          <h2 className="text-2xl font-bold tracking-tight text-slate-100 mt-0.5">{tenantName}</h2>
+          <p className="text-sm text-slate-400">Auditoría e inventario físico de las computadoras conectadas de la empresa.</p>
+        </div>
+        
+        {/* Tabs */}
+        <div className="flex bg-slate-900/50 p-1 rounded-xl border border-slate-800">
+          <button 
+            onClick={() => setActiveTab('inventory')}
+            className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
+              activeTab === 'inventory' 
+                ? 'bg-slate-800 text-violet-400 shadow-sm' 
+                : 'text-slate-400 hover:text-slate-300 hover:bg-slate-800/50'
+            }`}
+          >
+            Inventario
+          </button>
+          <button 
+            onClick={() => setActiveTab('agent')}
+            className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all flex items-center gap-2 ${
+              activeTab === 'agent' 
+                ? 'bg-slate-800 text-violet-400 shadow-sm' 
+                : 'text-slate-400 hover:text-slate-300 hover:bg-slate-800/50'
+            }`}
+          >
+            <Download className="h-4 w-4" />
+            Descargar Agente
+          </button>
+        </div>
+      </div>
+
+      {activeTab === 'inventory' ? (
+        <>
+          {/* Overview Cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        
+        {/* Total Computers */}
+        <div className="backdrop-blur-xl bg-slate-900/40 border border-slate-800/80 rounded-2xl p-6 flex items-center justify-between shadow-lg shadow-black/10 group">
+          <div>
+            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider block">Equipos Totales</span>
+            <span className="text-3xl font-extrabold text-slate-200 mt-1 block">{totalComputers}</span>
+          </div>
+          <div className="p-3 bg-indigo-500/10 border border-indigo-500/20 rounded-xl group-hover:scale-110 transition-transform duration-200">
+            <Monitor className="h-6 w-6 text-indigo-400" />
+          </div>
+        </div>
+
+        {/* Avg RAM */}
+        <div className="backdrop-blur-xl bg-slate-900/40 border border-slate-800/80 rounded-2xl p-6 flex items-center justify-between shadow-lg shadow-black/10 group">
+          <div>
+            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider block">RAM Promedio</span>
+            <span className="text-3xl font-extrabold text-slate-200 mt-1 block">{avgRam} GB</span>
+          </div>
+          <div className="p-3 bg-violet-500/10 border border-violet-500/20 rounded-xl group-hover:scale-110 transition-transform duration-200">
+            <Layers className="h-6 w-6 text-violet-400" />
+          </div>
+        </div>
+
+        {/* Total Storage */}
+        <div className="backdrop-blur-xl bg-slate-900/40 border border-slate-800/80 rounded-2xl p-6 flex items-center justify-between shadow-lg shadow-black/10 group">
+          <div>
+            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider block">Almacenamiento Total</span>
+            <span className="text-3xl font-extrabold text-slate-200 mt-1 block">{(totalStorage / 1024).toFixed(2)} TB</span>
+          </div>
+          <div className="p-3 bg-teal-500/10 border border-teal-500/20 rounded-xl group-hover:scale-110 transition-transform duration-200">
+            <HardDrive className="h-6 w-6 text-teal-400" />
+          </div>
+        </div>
+
+        {/* Active Users */}
+        <div className="backdrop-blur-xl bg-slate-900/40 border border-slate-800/80 rounded-2xl p-6 flex items-center justify-between shadow-lg shadow-black/10 group">
+          <div>
+            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider block">Último Reporte</span>
+            <span className="text-sm font-extrabold text-emerald-400 mt-3 block flex items-center gap-1.5 leading-none">
+              <Activity className="h-4 w-4 text-emerald-400 animate-pulse" />
+              Sistemas Online
+            </span>
+          </div>
+          <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl">
+            <ShieldCheck className="h-6 w-6 text-emerald-400" />
+          </div>
+        </div>
+
+      </div>
+
+      {/* Distribution Charts */}
+      {totalComputers > 0 && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* OS Distribution */}
+          <div className="backdrop-blur-xl bg-slate-900/40 border border-slate-800/80 rounded-2xl p-6">
+            <h3 className="text-sm font-bold text-slate-300 mb-4">Distribución de Sistemas Operativos</h3>
+            <div className="space-y-4">
+              {Object.entries(osCount).map(([os, count]) => {
+                const percent = Math.round((count / totalComputers) * 100)
+                return (
+                  <div key={os} className="space-y-1.5">
+                    <div className="flex justify-between text-xs">
+                      <span className="text-slate-300 font-semibold">{os}</span>
+                      <span className="text-slate-500">{count} equipo(s) ({percent}%)</span>
+                    </div>
+                    <div className="h-2 bg-slate-950 rounded-full overflow-hidden border border-slate-900">
+                      <div 
+                        className="h-full bg-gradient-to-r from-violet-500 to-indigo-500 rounded-full" 
+                        style={{ width: `${percent}%` }}
+                      />
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+
+          {/* RAM Capacity Distribution */}
+          <div className="backdrop-blur-xl bg-slate-900/40 border border-slate-800/80 rounded-2xl p-6">
+            <h3 className="text-sm font-bold text-slate-300 mb-4">Capacidad de Memoria RAM</h3>
+            <div className="space-y-4">
+              {Object.entries(ramCount).map(([ramLabel, count]) => {
+                const percent = totalComputers > 0 ? Math.round((count / totalComputers) * 100) : 0
+                return (
+                  <div key={ramLabel} className="space-y-1.5">
+                    <div className="flex justify-between text-xs">
+                      <span className="text-slate-300 font-semibold">{ramLabel}</span>
+                      <span className="text-slate-500">{count} equipo(s) ({percent}%)</span>
+                    </div>
+                    <div className="h-2 bg-slate-950 rounded-full overflow-hidden border border-slate-900">
+                      <div 
+                        className="h-full bg-gradient-to-r from-indigo-500 to-teal-500 rounded-full" 
+                        style={{ width: `${percent}%` }}
+                      />
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Main Asset Table */}
+      <div className="backdrop-blur-xl bg-slate-900/40 border border-slate-800/80 rounded-2xl p-6 shadow-xl shadow-black/10">
+        
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+          <div>
+            <h3 className="text-lg font-bold text-slate-200">Equipos de Cómputo</h3>
+            <span className="text-xs text-slate-500">Haz clic en cualquier fila para auditar los componentes físicos a detalle.</span>
+          </div>
+          
+          <div className="relative w-full sm:w-80">
+            <Search className="absolute inset-y-0 left-0 pl-3 h-full w-5 text-slate-500 flex items-center justify-center pointer-events-none" />
+            <input
+              type="text"
+              placeholder="Filtrar por Hostname, CPU, OS, Usuario..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-10 pr-4 py-2.5 bg-slate-950/60 border border-slate-800 rounded-xl text-slate-200 placeholder-slate-500 focus:outline-none focus:border-violet-500 text-xs"
+            />
+          </div>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="border-b border-slate-800 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                <th className="pb-3 pl-2">Equipo (Hostname)</th>
+                <th className="pb-3">Sistema Operativo</th>
+                <th className="pb-3">Procesador</th>
+                <th className="pb-3 text-center">RAM</th>
+                <th className="pb-3 text-center">Almacenamiento</th>
+                <th className="pb-3">Último Usuario</th>
+                <th className="pb-3 text-right pr-2">Último Reporte</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-850 text-sm">
+              {filteredEquipos.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="py-8 text-center text-slate-500">
+                    No se encontraron computadoras registradas.
+                  </td>
+                </tr>
+              ) : (
+                filteredEquipos.map(e => (
+                  <tr 
+                    key={e.id} 
+                    onClick={() => setSelectedEquipo(e)}
+                    className="hover:bg-slate-900/20 cursor-pointer transition-colors group"
+                  >
+                    <td className="py-4 pl-2 font-bold text-slate-200 group-hover:text-violet-400 transition-colors">
+                      {e.hostname}
+                    </td>
+                    <td className="py-4 text-xs text-slate-300">{e.os}</td>
+                    <td className="py-4 text-xs text-slate-400 max-w-[180px] truncate" title={e.processor}>
+                      {e.processor}
+                    </td>
+                    <td className="py-4 text-center font-semibold text-xs">
+                      {e.ram_details?.total_gb || 0} GB
+                    </td>
+                    <td className="py-4 text-center font-semibold text-xs text-slate-300">
+                      {e.disk_details?.total_gb || 0} GB
+                    </td>
+                    <td className="py-4 text-xs text-slate-400 font-medium">
+                      <span className="inline-flex items-center gap-1">
+                        <User className="h-3.5 w-3.5 text-slate-500" />
+                        {e.last_user}
+                      </span>
+                    </td>
+                    <td className="py-4 text-right pr-2 text-xs text-slate-500 font-mono">
+                      {new Date(e.updated_at).toLocaleString('es-ES', { 
+                        month: 'short', 
+                        day: 'numeric', 
+                        hour: '2-digit', 
+                        minute: '2-digit' 
+                      })}
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+
+      </div>
+
+      {/* Detail Modal Component */}
+      {selectedEquipo && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4 animate-fade-in">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-3xl max-h-[90vh] overflow-y-auto shadow-2xl relative">
+            
+            {/* Modal Header */}
+            <div className="p-6 border-b border-slate-800 flex justify-between items-center bg-slate-950/40">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-violet-500/10 border border-violet-500/20 rounded-xl">
+                  <Monitor className="h-6 w-6 text-violet-400" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold text-slate-100 leading-none">{selectedEquipo.hostname}</h3>
+                  <span className="text-xs text-slate-500 mt-1 block">Ficha técnica de componentes</span>
+                </div>
+              </div>
+              <button 
+                onClick={() => setSelectedEquipo(null)}
+                className="text-slate-400 hover:text-slate-200 p-2 hover:bg-slate-800/80 rounded-xl transition-all"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* Modal Content */}
+            <div className="p-6 space-y-6">
+              
+              {/* General Info Grid */}
+              <div className="grid grid-cols-2 sm:grid-cols-6 gap-4">
+                <div className="bg-slate-950/40 border border-slate-800/50 p-3 rounded-xl">
+                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Dominio</span>
+                  <span className="text-xs font-semibold text-slate-200 mt-1 flex items-center gap-1.5 truncate" title={selectedEquipo.domain || 'Workgroup'}>
+                    {selectedEquipo.domain || 'Workgroup'}
+                  </span>
+                </div>
+                <div className="bg-slate-950/40 border border-slate-800/50 p-3 rounded-xl">
+                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Último Usuario</span>
+                  <span className="text-xs font-semibold text-slate-200 mt-1 flex items-center gap-1.5 truncate" title={selectedEquipo.last_user}>
+                    <User className="h-3.5 w-3.5 text-slate-400" />
+                    {selectedEquipo.last_user}
+                  </span>
+                </div>
+                <div className="bg-slate-950/40 border border-slate-800/50 p-3 rounded-xl">
+                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Fabricante</span>
+                  <span className="text-xs font-semibold text-slate-200 mt-1 block">{selectedEquipo.manufacturer}</span>
+                </div>
+                <div className="bg-slate-950/40 border border-slate-800/50 p-3 rounded-xl">
+                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Modelo</span>
+                  <span className="text-xs font-semibold text-slate-200 mt-1 block">{selectedEquipo.model}</span>
+                </div>
+                <div className="bg-slate-950/40 border border-slate-800/50 p-3 rounded-xl">
+                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Número de Serie</span>
+                  <span className="text-xs font-mono font-semibold text-slate-200 mt-1 block truncate" title={selectedEquipo.serial_number}>
+                    {selectedEquipo.serial_number}
+                  </span>
+                </div>
+                <div className="bg-slate-950/40 border border-slate-800/50 p-3 rounded-xl">
+                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Último Reporte</span>
+                  <span className="text-xs font-semibold text-indigo-400 mt-1 block">
+                    {new Date(selectedEquipo.updated_at).toLocaleDateString()}
+                  </span>
+                </div>
+              </div>
+
+              {/* Hardware Components Section */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                
+                {/* Processor & Memory */}
+                <div className="space-y-4">
+                  <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider border-b border-slate-850 pb-2 flex items-center gap-1.5">
+                    <Cpu className="h-4 w-4 text-violet-400" /> CPU & Memoria RAM
+                  </h4>
+                  
+                  <div className="space-y-3">
+                    <div className="bg-slate-950/20 border border-slate-850 p-3 rounded-xl">
+                      <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Procesador</span>
+                      <span className="text-xs text-slate-200 mt-1 block font-medium">{selectedEquipo.processor}</span>
+                    </div>
+
+                    <div className="bg-slate-950/20 border border-slate-850 p-3 rounded-xl space-y-3">
+                      <div className="flex justify-between items-center border-b border-slate-900 pb-2">
+                        <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Memoria RAM Total</span>
+                        <span className="text-xs font-bold text-violet-400">{selectedEquipo.ram_details?.total_gb} GB</span>
+                      </div>
+                      <div className="space-y-2">
+                        {selectedEquipo.ram_details.modules.map((mod: any, idx: number) => (
+                          <div key={idx} className="flex justify-between items-center text-xs bg-slate-900/50 p-2 rounded-lg border border-slate-800">
+                            <div>
+                              <span className="font-semibold text-slate-300">
+                                Slot {idx + 1}: {mod.capacity_gb} GB {mod.memory_type && mod.memory_type !== 'Desconocido' ? mod.memory_type : ''} {mod.form_factor && mod.form_factor !== 'Desconocido' ? mod.form_factor : ''}
+                              </span>
+                              <span className="text-slate-500 ml-2 block sm:inline mt-1 sm:mt-0">
+                                {mod.manufacturer} {mod.part_number && mod.part_number !== 'Virtual Memory' ? `(${mod.part_number})` : ''}
+                              </span>
+                            </div>
+                            <span className="text-slate-400 ml-4">{mod.speed_mhz > 0 ? `${mod.speed_mhz} MHz` : ''}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Storage Disk Units */}
+                <div className="space-y-4">
+                  <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider border-b border-slate-850 pb-2 flex items-center gap-1.5">
+                    <HardDrive className="h-4 w-4 text-teal-400" /> Unidades de Disco
+                  </h4>
+                  
+                  <div className="bg-slate-950/20 border border-slate-850 p-3 rounded-xl space-y-3">
+                    <div className="flex justify-between items-center border-b border-slate-900 pb-2">
+                      <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Almacenamiento Total</span>
+                      <span className="text-xs font-bold text-teal-400">{selectedEquipo.disk_details?.total_gb} GB</span>
+                    </div>
+
+                    <div className="space-y-3.5">
+                      {selectedEquipo.disk_details?.drives?.map((drive, i) => {
+                        const usedPercent = Math.round((drive.used_space_gb / drive.size_gb) * 100)
+                        return (
+                          <div key={i} className="space-y-1.5 bg-slate-950/50 p-3 rounded-lg border border-slate-900">
+                            <div className="flex justify-between text-xs font-semibold">
+                              <span className="text-slate-200">
+                                Unidad {drive.drive_letter} ({drive.type})
+                              </span>
+                              <span className="text-slate-400 font-mono text-[10px]">
+                                {drive.used_space_gb} GB / {drive.size_gb} GB
+                              </span>
+                            </div>
+                            
+                            {/* Visual space bar */}
+                            <div className="h-2 bg-slate-950 rounded-full overflow-hidden">
+                              <div 
+                                className={`h-full rounded-full transition-all ${
+                                  usedPercent > 85 
+                                    ? 'bg-rose-500' 
+                                    : usedPercent > 70 
+                                      ? 'bg-amber-500' 
+                                      : 'bg-teal-500'
+                                }`} 
+                                style={{ width: `${usedPercent}%` }}
+                              />
+                            </div>
+                            
+                            <div className="flex justify-between text-[9px] text-slate-500">
+                              <span>{usedPercent}% en uso</span>
+                              <span>{drive.free_space_gb} GB libres</span>
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                </div>
+
+              </div>
+
+              {/* Security & Software section */}
+              <div className="bg-slate-950/30 border border-slate-850 p-4 rounded-2xl space-y-3">
+                <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider border-b border-slate-900 pb-2">
+                  Auditoría de Software y Seguridad
+                </h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+                  
+                  {/* Antivirus */}
+                  <div className="flex items-center gap-3 bg-slate-950/50 p-3 rounded-xl border border-slate-900">
+                    <ShieldCheck className="h-5 w-5 text-emerald-400 shrink-0" />
+                    <div>
+                      <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Antivirus Detectado</span>
+                      <span className="text-slate-200 font-semibold mt-0.5 block">
+                        {selectedEquipo.antivirus || 'No se detectó antivirus activo'}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Office */}
+                  <div className="flex items-center gap-3 bg-slate-950/50 p-3 rounded-xl border border-slate-900">
+                    <FileText className="h-5 w-5 text-indigo-400 shrink-0" />
+                    <div>
+                      <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Microsoft Office</span>
+                      <span className="text-slate-200 font-semibold mt-0.5 block">
+                        {selectedEquipo.office_version || 'No se detectó Office instalado'}
+                      </span>
+                    </div>
+                  </div>
+
+                </div>
+              </div>
+
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-4 border-t border-slate-805 bg-slate-950/40 text-right pr-6">
+              <button 
+                onClick={() => setSelectedEquipo(null)}
+                className="px-5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold rounded-xl text-xs transition-colors"
+              >
+                Cerrar Ficha
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
+        </>
+      ) : (
+        /* Agent Tab Content */
+        <div className="space-y-6 animate-fade-in">
+          
+          <div className="backdrop-blur-xl bg-slate-900/40 border border-slate-800/80 rounded-2xl p-6 lg:w-2/3 shadow-xl shadow-black/10">
+            <h3 className="text-lg font-bold text-slate-200 mb-2">Descargar e Instalar el Agente</h3>
+            <p className="text-sm text-slate-400 mb-6">
+              Para agregar computadoras a tu inventario, genera un <strong>Token de Instalación</strong> y descarga el agente. Luego, ejecuta el script en cada computadora que desees registrar usando PowerShell como Administrador.
+            </p>
+
+            <form 
+              ref={formRef}
+              action={async (formData) => {
+                setIsGeneratingKey(true)
+                const res = await generateTenantApiKey(formData.get('name') as string)
+                setIsGeneratingKey(false)
+                if (res?.error) {
+                  alert(res.error)
+                } else {
+                  setNewKeyName('')
+                  formRef.current?.reset()
+                }
+              }} 
+              className="flex gap-3 mb-8"
+            >
+              <div className="flex-1 relative">
+                <Key className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
+                <input
+                  type="text"
+                  name="name"
+                  placeholder="Ej: Servidor Sucursal Norte"
+                  value={newKeyName}
+                  onChange={(e) => setNewKeyName(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2.5 bg-slate-950/60 border border-slate-800 rounded-xl text-slate-200 placeholder-slate-500 focus:outline-none focus:border-violet-500 text-sm"
+                  required
+                />
+              </div>
+              <button 
+                type="submit" 
+                disabled={isGeneratingKey}
+                className="px-4 py-2.5 bg-violet-600 hover:bg-violet-500 text-white text-sm font-semibold rounded-xl flex items-center gap-2 transition-colors disabled:opacity-50"
+              >
+                {isGeneratingKey ? (
+                  <Activity className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Plus className="h-4 w-4" />
+                )}
+                Generar Token
+              </button>
+            </form>
+
+            <h4 className="text-sm font-semibold text-slate-300 mb-4">Tokens de Instalación Activos</h4>
+            <div className="space-y-3">
+              {apiKeys.length === 0 ? (
+                <p className="text-sm text-slate-500 italic">No has generado ningún token de instalación todavía.</p>
+              ) : (
+                apiKeys.map(key => (
+                  <div key={key.id} className="bg-slate-950/40 border border-slate-800 p-4 rounded-xl flex items-center justify-between group">
+                    <div>
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="font-semibold text-slate-200 text-sm">{key.name}</span>
+                        <span className="text-[10px] bg-slate-800 text-slate-400 px-2 py-0.5 rounded-full">
+                          {new Date(key.created_at).toLocaleDateString()}
+                        </span>
+                      </div>
+                      <div className="font-mono text-xs text-slate-400 select-all">
+                        {key.token}
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => handleCopy(key.token, key.id)}
+                        className="p-2 text-slate-400 hover:text-slate-200 hover:bg-slate-800 rounded-lg transition-colors flex items-center gap-2"
+                        title="Copiar token"
+                      >
+                        {copiedKeyId === key.id ? (
+                          <>
+                            <Check className="h-4 w-4 text-emerald-400" />
+                            <span className="text-xs text-emerald-400 font-medium">Copiado</span>
+                          </>
+                        ) : (
+                          <Copy className="h-4 w-4" />
+                        )}
+                      </button>
+                      
+                      {/* Download Button */}
+                      <button
+                        onClick={() => handleDownloadAgent(key.token, key.name)}
+                        className="p-2 text-indigo-400 hover:text-indigo-300 hover:bg-indigo-500/10 rounded-lg transition-colors flex items-center gap-2 border border-indigo-500/20"
+                        title="Descargar Agente con este token"
+                      >
+                        <Download className="h-4 w-4" />
+                        <span className="text-xs font-semibold">Descargar Agente</span>
+                      </button>
+
+                      <form action={async () => {
+                        if(confirm('¿Eliminar este token? Los equipos que lo usen dejarán de enviar reportes.')) {
+                          await deleteTenantApiKey(key.id)
+                        }
+                      }}>
+                        <button
+                          type="submit"
+                          className="p-2 text-rose-400/50 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-colors ml-2"
+                          title="Eliminar token"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </form>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
