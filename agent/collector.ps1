@@ -26,10 +26,13 @@ if ($isAdmin -and $MyInvocation.MyCommand.Path -ne $taskScript) {
         New-Item -ItemType Directory -Force -Path $taskPath | Out-Null
     }
     
-    # Copiar el script a la ruta persistente
-    Copy-Item -Path $MyInvocation.MyCommand.Path -Destination $taskScript -Force
-    
-    # Eliminar la tarea anterior si existe
+    if ($MyInvocation.MyCommand.Path) {
+        Copy-Item -Path $MyInvocation.MyCommand.Path -Destination $taskScript -Force
+    } elseif ($script) {
+        Set-Content -Path $taskScript -Value $script -Encoding UTF8
+    } else {
+        Write-Host "No se pudo copiar el agente a la carpeta segura para la tarea programada." -ForegroundColor Red
+    }
     $existingTask = Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
     if ($existingTask) {
         Unregister-ScheduledTask -TaskName $taskName -Confirm:$false
