@@ -26,6 +26,15 @@ interface RAMModule {
   speed_mhz: number
   part_number: string
   manufacturer: string
+  memory_type?: string
+  form_factor?: string
+}
+
+export interface ApiKey {
+  id: string
+  name: string
+  token: string
+  created_at: string
 }
 
 interface RAMDetails {
@@ -65,13 +74,13 @@ export interface Equipo {
 
 interface TenantDashboardProps {
   initialEquipos: Equipo[]
-  initialApiKeys: any[]
+  initialApiKeys: ApiKey[]
   tenantName: string
 }
 
 export default function TenantDashboard({ initialEquipos, initialApiKeys, tenantName }: TenantDashboardProps) {
   const [equipos] = useState<Equipo[]>(initialEquipos)
-  const [apiKeys] = useState<any[]>(initialApiKeys)
+  const [apiKeys] = useState<ApiKey[]>(initialApiKeys)
   const [activeTab, setActiveTab] = useState<'inventory' | 'agent'>('inventory')
   
   const [searchQuery, setSearchQuery] = useState('')
@@ -476,7 +485,7 @@ export default function TenantDashboard({ initialEquipos, initialApiKeys, tenant
                         <span className="text-xs font-bold text-violet-400">{selectedEquipo.ram_details?.total_gb} GB</span>
                       </div>
                       <div className="space-y-2">
-                        {selectedEquipo.ram_details.modules.map((mod: any, idx: number) => (
+                        {selectedEquipo.ram_details.modules.map((mod: RAMModule, idx: number) => (
                           <div key={idx} className="flex justify-between items-center text-xs bg-slate-900/50 p-2 rounded-lg border border-slate-800">
                             <div>
                               <span className="font-semibold text-slate-300">
