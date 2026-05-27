@@ -112,13 +112,15 @@ export default function TenantDashboard({ initialEquipos, initialApiKeys, tenant
       const currentUrl = window.location.origin
       text = text.replace('$API_URL     = "http://localhost:3000/api/collector"', `$API_URL     = "${currentUrl}/api/collector"`)
       
-      const blob = new Blob([text], { type: 'text/plain' })
+      const batContent = `@echo off\npowershell.exe -NoProfile -ExecutionPolicy Bypass -Command "$path='%~f0'; $lines=Get-Content $path; $script=$lines[3..($lines.Count-1)] -join [Environment]::NewLine; Invoke-Expression $script"\nexit /b\n` + text;
+
+      const blob = new Blob([batContent], { type: 'application/bat' })
       const url = URL.createObjectURL(blob)
       
       const a = document.createElement('a')
       a.href = url
       const safeName = tokenName.replace(/[^a-z0-9]/gi, '-').toLowerCase()
-      a.download = `collector-${safeName}.ps1`
+      a.download = `collector-${safeName}.bat`
       document.body.appendChild(a)
       a.click()
       

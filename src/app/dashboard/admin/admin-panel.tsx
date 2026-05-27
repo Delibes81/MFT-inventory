@@ -132,24 +132,22 @@ export default function AdminPanel({ initialTenants, initialApiKeys }: AdminPane
   const handleDownloadAgent = async (tokenValue: string, tokenName: string) => {
     try {
       const response = await fetch('/collector.ps1')
-      let scriptContent = await response.text()
+      let text = await response.text()
       
-      scriptContent = scriptContent.replace(
-        'INGRESA_TU_TOKEN_DE_INQUILINO_AQUI',
-        tokenValue
-      )
+      // Inject token and URL
+      text = text.replace('INGRESA_TU_TOKEN_DE_INQUILINO_AQUI', tokenValue)
+      const currentUrl = window.location.origin
+      text = text.replace('$API_URL     = "http://localhost:3000/api/collector"', `$API_URL     = "${currentUrl}/api/collector"`)
       
-      const currentOrigin = window.location.origin
-      scriptContent = scriptContent.replace(
-        '"http://localhost:3000"',
-        `"${currentOrigin}"`
-      )
+      const batContent = `@echo off\npowershell.exe -NoProfile -ExecutionPolicy Bypass -Command "$path='%~f0'; $lines=Get-Content $path; $script=$lines[3..($lines.Count-1)] -join [Environment]::NewLine; Invoke-Expression $script"\nexit /b\n` + text;
 
-      const blob = new Blob([scriptContent], { type: 'text/plain' })
+      const blob = new Blob([batContent], { type: 'application/bat' })
       const url = URL.createObjectURL(blob)
+      
       const a = document.createElement('a')
       a.href = url
-      a.download = `collector-${tokenName.replace(/\s+/g, '-').toLowerCase()}.ps1`
+      const safeName = tokenName.replace(/[^a-z0-9]/gi, '-').toLowerCase()
+      a.download = `collector-${safeName}.bat`
       document.body.appendChild(a)
       a.click()
       document.body.removeChild(a)
