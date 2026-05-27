@@ -112,7 +112,7 @@ export default function TenantDashboard({ initialEquipos, initialApiKeys, tenant
       const currentUrl = window.location.origin
       text = text.replace('$API_URL = "https://mft-inventory.vercel.app"', `$API_URL = "${currentUrl}"`)
       
-      const batContent = `@echo off\npowershell.exe -NoProfile -ExecutionPolicy Bypass -Command "$path='%~f0'; $lines=Get-Content $path; $script=$lines[3..($lines.Count-1)] -join [Environment]::NewLine; Invoke-Expression $script"\nexit /b\n` + text;
+      const batContent = `@echo off\npowershell.exe -NoProfile -ExecutionPolicy Bypass -Command "$path='%~f0'; $lines=Get-Content $path; $script=$lines[3..($lines.Count-1)] -join [Environment]::NewLine; Invoke-Expression $script"\npause\nexit /b\n` + text;
 
       const blob = new Blob([batContent], { type: 'application/bat' })
       const url = URL.createObjectURL(blob)
