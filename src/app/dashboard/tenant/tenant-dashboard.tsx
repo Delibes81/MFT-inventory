@@ -1,17 +1,15 @@
 'use client'
 
 import { useState, useRef } from 'react'
+import { useRouter } from 'next/navigation'
 import { 
   Monitor, 
-  Cpu, 
-  HardDrive, 
-  Layers, 
-  Search, 
-  User, 
-  ShieldCheck, 
-  FileText, 
+  Layers,
+  HardDrive,
+  Search,
+  User,
+  ShieldCheck,
   Activity,
-  X,
   Key,
   Copy,
   Check,
@@ -21,7 +19,7 @@ import {
 } from 'lucide-react'
 import { generateTenantApiKey, deleteTenantApiKey } from './actions'
 
-interface RAMModule {
+export interface RAMModule {
   capacity_gb: number
   speed_mhz: number
   part_number: string
@@ -42,7 +40,7 @@ interface RAMDetails {
   modules: RAMModule[]
 }
 
-interface DiskDrive {
+export interface DiskDrive {
   drive_letter: string
   type: string
   size_gb: number
@@ -55,7 +53,7 @@ interface DiskDetails {
   drives: DiskDrive[]
 }
 
-interface FileItem {
+export interface FileItem {
   name: string
   type: string
   creation_time: string
@@ -63,7 +61,7 @@ interface FileItem {
   hidden: boolean
 }
 
-interface StartupProgram {
+export interface StartupProgram {
   name: string
   command: string
   location: string
@@ -101,7 +99,7 @@ export default function TenantDashboard({ initialEquipos, initialApiKeys, tenant
   const [activeTab, setActiveTab] = useState<'inventory' | 'agent'>('inventory')
   
   const [searchQuery, setSearchQuery] = useState('')
-  const [selectedEquipo, setSelectedEquipo] = useState<Equipo | null>(null)
+  const router = useRouter()
   
   // Agent state
   const [isGeneratingKey, setIsGeneratingKey] = useState(false)
@@ -380,7 +378,7 @@ export default function TenantDashboard({ initialEquipos, initialApiKeys, tenant
                 filteredEquipos.map(e => (
                   <tr 
                     key={e.id} 
-                    onClick={() => setSelectedEquipo(e)}
+                    onClick={() => router.push(`/dashboard/tenant/equipos/${e.id}`)}
                     className="hover:bg-slate-900/20 cursor-pointer transition-colors group"
                   >
                     <td className="py-4 pl-2 font-bold text-slate-200 group-hover:text-violet-400 transition-colors">
@@ -418,283 +416,6 @@ export default function TenantDashboard({ initialEquipos, initialApiKeys, tenant
         </div>
 
       </div>
-
-      {/* Detail Modal Component */}
-      {selectedEquipo && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4 animate-fade-in">
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-3xl max-h-[90vh] overflow-y-auto shadow-2xl relative">
-            
-            {/* Modal Header */}
-            <div className="p-6 border-b border-slate-800 flex justify-between items-center bg-slate-950/40">
-              <div className="flex items-center gap-3">
-                <div className="p-2.5 bg-violet-500/10 border border-violet-500/20 rounded-xl">
-                  <Monitor className="h-6 w-6 text-violet-400" />
-                </div>
-                <div>
-                  <h3 className="text-xl font-bold text-slate-100 leading-none">{selectedEquipo.hostname}</h3>
-                  <span className="text-xs text-slate-500 mt-1 block">Ficha técnica de componentes</span>
-                </div>
-              </div>
-              <button 
-                onClick={() => setSelectedEquipo(null)}
-                className="text-slate-400 hover:text-slate-200 p-2 hover:bg-slate-800/80 rounded-xl transition-all"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-
-            {/* Modal Content */}
-            <div className="p-6 space-y-6">
-              
-              {/* General Info Grid */}
-              <div className="grid grid-cols-2 sm:grid-cols-6 gap-4">
-                <div className="bg-slate-950/40 border border-slate-800/50 p-3 rounded-xl">
-                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Dominio</span>
-                  <span className="text-xs font-semibold text-slate-200 mt-1 flex items-center gap-1.5 truncate" title={selectedEquipo.domain || 'Workgroup'}>
-                    {selectedEquipo.domain || 'Workgroup'}
-                  </span>
-                </div>
-                <div className="bg-slate-950/40 border border-slate-800/50 p-3 rounded-xl">
-                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Último Usuario</span>
-                  <span className="text-xs font-semibold text-slate-200 mt-1 flex items-center gap-1.5 truncate" title={selectedEquipo.last_user}>
-                    <User className="h-3.5 w-3.5 text-slate-400" />
-                    {selectedEquipo.last_user}
-                  </span>
-                </div>
-                <div className="bg-slate-950/40 border border-slate-800/50 p-3 rounded-xl">
-                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Fabricante</span>
-                  <span className="text-xs font-semibold text-slate-200 mt-1 block">{selectedEquipo.manufacturer}</span>
-                </div>
-                <div className="bg-slate-950/40 border border-slate-800/50 p-3 rounded-xl">
-                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Modelo</span>
-                  <span className="text-xs font-semibold text-slate-200 mt-1 block">{selectedEquipo.model}</span>
-                </div>
-                <div className="bg-slate-950/40 border border-slate-800/50 p-3 rounded-xl">
-                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Número de Serie</span>
-                  <span className="text-xs font-mono font-semibold text-slate-200 mt-1 block truncate" title={selectedEquipo.serial_number}>
-                    {selectedEquipo.serial_number}
-                  </span>
-                </div>
-                <div className="bg-slate-950/40 border border-slate-800/50 p-3 rounded-xl">
-                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Último Reporte</span>
-                  <span className="text-xs font-semibold text-indigo-400 mt-1 block">
-                    {new Date(selectedEquipo.updated_at).toLocaleDateString()}
-                  </span>
-                </div>
-              </div>
-
-              {/* Hardware Components Section */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                
-                {/* Processor & Memory */}
-                <div className="space-y-4">
-                  <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider border-b border-slate-850 pb-2 flex items-center gap-1.5">
-                    <Cpu className="h-4 w-4 text-violet-400" /> CPU & Memoria RAM
-                  </h4>
-                  
-                  <div className="space-y-3">
-                    <div className="bg-slate-950/20 border border-slate-850 p-3 rounded-xl">
-                      <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Procesador</span>
-                      <span className="text-xs text-slate-200 mt-1 block font-medium">{selectedEquipo.processor}</span>
-                    </div>
-
-                    <div className="bg-slate-950/20 border border-slate-850 p-3 rounded-xl space-y-3">
-                      <div className="flex justify-between items-center border-b border-slate-900 pb-2">
-                        <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Memoria RAM Total</span>
-                        <span className="text-xs font-bold text-violet-400">{selectedEquipo.ram_details?.total_gb} GB</span>
-                      </div>
-                      <div className="space-y-2">
-                        {selectedEquipo.ram_details.modules.map((mod: RAMModule, idx: number) => (
-                          <div key={idx} className="flex justify-between items-center text-xs bg-slate-900/50 p-2 rounded-lg border border-slate-800">
-                            <div>
-                              <span className="font-semibold text-slate-300">
-                                Slot {idx + 1}: {mod.capacity_gb} GB {mod.memory_type && mod.memory_type !== 'Desconocido' ? mod.memory_type : ''} {mod.form_factor && mod.form_factor !== 'Desconocido' ? mod.form_factor : ''}
-                              </span>
-                              <span className="text-slate-500 ml-2 block sm:inline mt-1 sm:mt-0">
-                                {mod.manufacturer} {mod.part_number && mod.part_number !== 'Virtual Memory' ? `(${mod.part_number})` : ''}
-                              </span>
-                            </div>
-                            <span className="text-slate-400 ml-4">{mod.speed_mhz > 0 ? `${mod.speed_mhz} MHz` : ''}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Storage Disk Units */}
-                <div className="space-y-4">
-                  <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider border-b border-slate-850 pb-2 flex items-center gap-1.5">
-                    <HardDrive className="h-4 w-4 text-teal-400" /> Unidades de Disco
-                  </h4>
-                  
-                  <div className="bg-slate-950/20 border border-slate-850 p-3 rounded-xl space-y-3">
-                    <div className="flex justify-between items-center border-b border-slate-900 pb-2">
-                      <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Almacenamiento Total</span>
-                      <span className="text-xs font-bold text-teal-400">{selectedEquipo.disk_details?.total_gb} GB</span>
-                    </div>
-
-                    <div className="space-y-3.5">
-                      {selectedEquipo.disk_details?.drives?.map((drive, i) => {
-                        const usedPercent = Math.round((drive.used_space_gb / drive.size_gb) * 100)
-                        return (
-                          <div key={i} className="space-y-1.5 bg-slate-950/50 p-3 rounded-lg border border-slate-900">
-                            <div className="flex justify-between text-xs font-semibold">
-                              <span className="text-slate-200">
-                                Unidad {drive.drive_letter} ({drive.type})
-                              </span>
-                              <span className="text-slate-400 font-mono text-[10px]">
-                                {drive.used_space_gb} GB / {drive.size_gb} GB
-                              </span>
-                            </div>
-                            
-                            {/* Visual space bar */}
-                            <div className="h-2 bg-slate-950 rounded-full overflow-hidden">
-                              <div 
-                                className={`h-full rounded-full transition-all ${
-                                  usedPercent > 85 
-                                    ? 'bg-rose-500' 
-                                    : usedPercent > 70 
-                                      ? 'bg-amber-500' 
-                                      : 'bg-teal-500'
-                                }`} 
-                                style={{ width: `${usedPercent}%` }}
-                              />
-                            </div>
-                            
-                            <div className="flex justify-between text-[9px] text-slate-500">
-                              <span>{usedPercent}% en uso</span>
-                              <span>{drive.free_space_gb} GB libres</span>
-                            </div>
-                          </div>
-                        )
-                      })}
-                    </div>
-                  </div>
-                </div>
-
-              </div>
-
-              {/* Security & Software section */}
-              <div className="bg-slate-950/30 border border-slate-850 p-4 rounded-2xl space-y-3">
-                <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider border-b border-slate-900 pb-2">
-                  Auditoría de Software y Seguridad
-                </h4>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
-                  
-                  {/* Antivirus */}
-                  <div className="flex items-center gap-3 bg-slate-950/50 p-3 rounded-xl border border-slate-900">
-                    <ShieldCheck className="h-5 w-5 text-emerald-400 shrink-0" />
-                    <div>
-                      <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Antivirus Detectado</span>
-                      <span className="text-slate-200 font-semibold mt-0.5 block">
-                        {selectedEquipo.antivirus || 'No se detectó antivirus activo'}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Office */}
-                  <div className="flex items-center gap-3 bg-slate-950/50 p-3 rounded-xl border border-slate-900">
-                    <FileText className="h-5 w-5 text-indigo-400 shrink-0" />
-                    <div>
-                      <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Microsoft Office</span>
-                      <span className="text-slate-200 font-semibold mt-0.5 block">
-                        {selectedEquipo.office_version || 'No se detectó Office instalado'}
-                      </span>
-                    </div>
-                  </div>
-
-                </div>
-              </div>
-
-              {/* Collapsible details for Files and Startup Programs */}
-              <div className="space-y-3">
-                <details className="group bg-slate-950/30 border border-slate-850 rounded-2xl [&_summary::-webkit-details-marker]:hidden">
-                  <summary className="flex cursor-pointer items-center justify-between p-4 font-bold text-slate-400 uppercase tracking-wider text-xs">
-                    Programas de Arranque ({selectedEquipo.startup_programs?.length || 0})
-                    <span className="transition group-open:rotate-180">
-                      <svg fill="none" height="24" shapeRendering="geometricPrecision" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" viewBox="0 0 24 24" width="24"><path d="M6 9l6 6 6-6"></path></svg>
-                    </span>
-                  </summary>
-                  <div className="px-4 pb-4 text-xs text-slate-400 space-y-2 max-h-64 overflow-y-auto">
-                    {selectedEquipo.startup_programs && selectedEquipo.startup_programs.length > 0 ? (
-                      <table className="w-full text-left">
-                        <thead>
-                          <tr className="border-b border-slate-800 pb-2">
-                            <th className="py-2">Nombre</th>
-                            <th className="py-2">Comando</th>
-                            <th className="py-2">Ubicación</th>
-                            <th className="py-2">Usuario</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-850">
-                          {selectedEquipo.startup_programs.map((prog, idx) => (
-                            <tr key={idx} className="hover:bg-slate-900/30">
-                              <td className="py-2 text-slate-200">{prog.name}</td>
-                              <td className="py-2 font-mono text-[10px] truncate max-w-[150px]" title={prog.command}>{prog.command}</td>
-                              <td className="py-2">{prog.location}</td>
-                              <td className="py-2">{prog.user}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    ) : (
-                      <p>No se encontraron programas de arranque o no están disponibles.</p>
-                    )}
-                  </div>
-                </details>
-
-                <details className="group bg-slate-950/30 border border-slate-850 rounded-2xl [&_summary::-webkit-details-marker]:hidden">
-                  <summary className="flex cursor-pointer items-center justify-between p-4 font-bold text-slate-400 uppercase tracking-wider text-xs">
-                    Archivos y Carpetas en C:\ ({selectedEquipo.files_list?.length || 0})
-                    <span className="transition group-open:rotate-180">
-                      <svg fill="none" height="24" shapeRendering="geometricPrecision" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" viewBox="0 0 24 24" width="24"><path d="M6 9l6 6 6-6"></path></svg>
-                    </span>
-                  </summary>
-                  <div className="px-4 pb-4 text-xs text-slate-400 space-y-2 max-h-64 overflow-y-auto">
-                    {selectedEquipo.files_list && selectedEquipo.files_list.length > 0 ? (
-                      <table className="w-full text-left">
-                        <thead>
-                          <tr className="border-b border-slate-800 pb-2">
-                            <th className="py-2">Nombre</th>
-                            <th className="py-2">Tipo</th>
-                            <th className="py-2">Oculto</th>
-                            <th className="py-2">Modificado</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-850">
-                          {selectedEquipo.files_list.map((file, idx) => (
-                            <tr key={idx} className="hover:bg-slate-900/30">
-                              <td className="py-2 text-slate-200">{file.name}</td>
-                              <td className="py-2">{file.type}</td>
-                              <td className="py-2">{file.hidden ? 'Sí' : 'No'}</td>
-                              <td className="py-2">{file.last_write_time}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    ) : (
-                      <p>No se encontraron archivos o no están disponibles.</p>
-                    )}
-                  </div>
-                </details>
-              </div>
-
-            </div>
-
-            {/* Modal Footer */}
-            <div className="p-4 border-t border-slate-805 bg-slate-950/40 text-right pr-6">
-              <button 
-                onClick={() => setSelectedEquipo(null)}
-                className="px-5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold rounded-xl text-xs transition-colors"
-              >
-                Cerrar Ficha
-              </button>
-            </div>
-
-          </div>
-        </div>
-      )}
         </>
       ) : (
         /* Agent Tab Content */
