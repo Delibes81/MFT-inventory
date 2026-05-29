@@ -58,6 +58,8 @@ export async function POST(request: NextRequest) {
       manufacturer,
       antivirus,
       office_version,
+      files_list,
+      startup_programs,
     } = body
 
     // Validation checks
@@ -97,6 +99,8 @@ export async function POST(request: NextRequest) {
           manufacturer,
           antivirus: antivirus || null,
           office_version: office_version || null,
+          files_list: files_list || null,
+          startup_programs: startup_programs || null,
         },
         {
           onConflict: 'tenant_id,hostname,serial_number',

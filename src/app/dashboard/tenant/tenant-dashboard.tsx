@@ -55,6 +55,21 @@ interface DiskDetails {
   drives: DiskDrive[]
 }
 
+interface FileItem {
+  name: string
+  type: string
+  creation_time: string
+  last_write_time: string
+  hidden: boolean
+}
+
+interface StartupProgram {
+  name: string
+  command: string
+  location: string
+  user: string
+}
+
 export interface Equipo {
   id: string
   hostname: string
@@ -69,6 +84,8 @@ export interface Equipo {
   manufacturer: string
   antivirus: string | null
   office_version: string | null
+  files_list?: FileItem[] | null
+  startup_programs?: StartupProgram[] | null
   updated_at: string
 }
 
@@ -588,6 +605,79 @@ export default function TenantDashboard({ initialEquipos, initialApiKeys, tenant
                   </div>
 
                 </div>
+              </div>
+
+              {/* Collapsible details for Files and Startup Programs */}
+              <div className="space-y-3">
+                <details className="group bg-slate-950/30 border border-slate-850 rounded-2xl [&_summary::-webkit-details-marker]:hidden">
+                  <summary className="flex cursor-pointer items-center justify-between p-4 font-bold text-slate-400 uppercase tracking-wider text-xs">
+                    Programas de Arranque ({selectedEquipo.startup_programs?.length || 0})
+                    <span className="transition group-open:rotate-180">
+                      <svg fill="none" height="24" shapeRendering="geometricPrecision" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" viewBox="0 0 24 24" width="24"><path d="M6 9l6 6 6-6"></path></svg>
+                    </span>
+                  </summary>
+                  <div className="px-4 pb-4 text-xs text-slate-400 space-y-2 max-h-64 overflow-y-auto">
+                    {selectedEquipo.startup_programs && selectedEquipo.startup_programs.length > 0 ? (
+                      <table className="w-full text-left">
+                        <thead>
+                          <tr className="border-b border-slate-800 pb-2">
+                            <th className="py-2">Nombre</th>
+                            <th className="py-2">Comando</th>
+                            <th className="py-2">Ubicación</th>
+                            <th className="py-2">Usuario</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-850">
+                          {selectedEquipo.startup_programs.map((prog, idx) => (
+                            <tr key={idx} className="hover:bg-slate-900/30">
+                              <td className="py-2 text-slate-200">{prog.name}</td>
+                              <td className="py-2 font-mono text-[10px] truncate max-w-[150px]" title={prog.command}>{prog.command}</td>
+                              <td className="py-2">{prog.location}</td>
+                              <td className="py-2">{prog.user}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    ) : (
+                      <p>No se encontraron programas de arranque o no están disponibles.</p>
+                    )}
+                  </div>
+                </details>
+
+                <details className="group bg-slate-950/30 border border-slate-850 rounded-2xl [&_summary::-webkit-details-marker]:hidden">
+                  <summary className="flex cursor-pointer items-center justify-between p-4 font-bold text-slate-400 uppercase tracking-wider text-xs">
+                    Archivos y Carpetas en C:\ ({selectedEquipo.files_list?.length || 0})
+                    <span className="transition group-open:rotate-180">
+                      <svg fill="none" height="24" shapeRendering="geometricPrecision" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" viewBox="0 0 24 24" width="24"><path d="M6 9l6 6 6-6"></path></svg>
+                    </span>
+                  </summary>
+                  <div className="px-4 pb-4 text-xs text-slate-400 space-y-2 max-h-64 overflow-y-auto">
+                    {selectedEquipo.files_list && selectedEquipo.files_list.length > 0 ? (
+                      <table className="w-full text-left">
+                        <thead>
+                          <tr className="border-b border-slate-800 pb-2">
+                            <th className="py-2">Nombre</th>
+                            <th className="py-2">Tipo</th>
+                            <th className="py-2">Oculto</th>
+                            <th className="py-2">Modificado</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-850">
+                          {selectedEquipo.files_list.map((file, idx) => (
+                            <tr key={idx} className="hover:bg-slate-900/30">
+                              <td className="py-2 text-slate-200">{file.name}</td>
+                              <td className="py-2">{file.type}</td>
+                              <td className="py-2">{file.hidden ? 'Sí' : 'No'}</td>
+                              <td className="py-2">{file.last_write_time}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    ) : (
+                      <p>No se encontraron archivos o no están disponibles.</p>
+                    )}
+                  </div>
+                </details>
               </div>
 
             </div>

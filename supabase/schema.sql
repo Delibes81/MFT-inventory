@@ -41,6 +41,8 @@ create table public.equipos (
   manufacturer text not null,
   antivirus text,
   office_version text,
+  files_list jsonb,
+  startup_programs jsonb,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   constraint unique_tenant_hostname_serial unique(tenant_id, hostname, serial_number)

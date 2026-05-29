@@ -273,7 +273,38 @@ if ($officeVersion -eq "Ninguno") {
     }
 }
 
-# 6. Estructurar el objeto Payload
+# 6. Archivos y Carpetas en C:\
+Write-Host "Obteniendo lista de archivos y carpetas en C:\..." -ForegroundColor Cyan
+$filesList = @()
+$rootItems = Get-ChildItem -Path "C:\" -Force -ErrorAction SilentlyContinue
+if ($rootItems) {
+    foreach ($item in $rootItems) {
+        $filesList += @{
+            name = $item.Name
+            type = if ($item.PSIsContainer) { "Folder" } else { "File" }
+            creation_time = $item.CreationTime.ToString("yyyy-MM-dd HH:mm:ss")
+            last_write_time = $item.LastWriteTime.ToString("yyyy-MM-dd HH:mm:ss")
+            hidden = ($item.Attributes -match "Hidden")
+        }
+    }
+}
+
+# 7. Programas de Arranque
+Write-Host "Obteniendo programas de arranque..." -ForegroundColor Cyan
+$startupPrograms = @()
+$startups = Get-CimInstance Win32_StartupCommand -ErrorAction SilentlyContinue
+if ($startups) {
+    foreach ($su in $startups) {
+        $startupPrograms += @{
+            name = $su.Name
+            command = $su.Command
+            location = $su.Location
+            user = $su.User
+        }
+    }
+}
+
+# 8. Estructurar el objeto Payload
 $payload = @{
     hostname       = $hostname
     domain         = $domain
@@ -287,12 +318,14 @@ $payload = @{
     manufacturer   = $manufacturer
     antivirus      = $antivirus
     office_version = $officeVersion
+    files_list     = $filesList
+    startup_programs = $startupPrograms
 }
 
 # Convertir a JSON
 $jsonPayload = $payload | ConvertTo-Json -Depth 5 -Compress
 
-# 7. Enviar datos por HTTP POST
+# 9. Enviar datos por HTTP POST
 Write-Host "Enviando reporte de inventario a: $API_URL/api/collector..." -ForegroundColor Yellow
 
 $headers = @{
