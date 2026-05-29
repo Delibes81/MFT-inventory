@@ -14,9 +14,8 @@ import {
   Equipo, 
   RAMModule, 
   DiskDrive, 
-  StartupProgram, 
-  FileItem 
 } from '../../tenant-dashboard'
+import SortableTables from './sortable-tables'
 
 export const dynamic = 'force-dynamic'
 
@@ -233,83 +232,10 @@ export default async function EquipoDetailPage({ params }: { params: { id: strin
         </div>
 
         {/* Tables for Files and Startup Programs */}
-        <div className="space-y-6">
-          <div className="bg-slate-900/30 border border-slate-800/60 rounded-2xl overflow-hidden shadow-sm">
-            <div className="p-5 border-b border-slate-800 bg-slate-950/20">
-              <h4 className="text-sm font-bold text-slate-200 uppercase tracking-wider">
-                Programas de Arranque <span className="text-slate-500 ml-2 text-xs bg-slate-800 px-2 py-1 rounded-full">{selectedEquipo.startup_programs?.length || 0} items</span>
-              </h4>
-            </div>
-            <div className="p-0 overflow-x-auto">
-              {selectedEquipo.startup_programs && selectedEquipo.startup_programs.length > 0 ? (
-                <table className="w-full text-left border-collapse min-w-[600px]">
-                  <thead>
-                    <tr className="bg-slate-900/60 border-b border-slate-800 text-xs font-bold text-slate-500 uppercase tracking-wider">
-                      <th className="py-3 px-5">Nombre</th>
-                      <th className="py-3 px-5">Comando</th>
-                      <th className="py-3 px-5">Ubicación</th>
-                      <th className="py-3 px-5">Usuario</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-800/50 text-sm">
-                    {selectedEquipo.startup_programs.map((prog: StartupProgram, idx: number) => (
-                      <tr key={idx} className="hover:bg-slate-900/30 transition-colors">
-                        <td className="py-3 px-5 font-medium text-slate-200">{prog.name}</td>
-                        <td className="py-3 px-5 font-mono text-xs text-slate-400 max-w-[300px] truncate" title={prog.command}>{prog.command}</td>
-                        <td className="py-3 px-5 text-slate-400">{prog.location}</td>
-                        <td className="py-3 px-5 text-slate-400">{prog.user}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              ) : (
-                <div className="p-8 text-center text-slate-500 text-sm">
-                  No se encontraron programas de arranque o no están disponibles.
-                </div>
-              )}
-            </div>
-          </div>
-
-          <div className="bg-slate-900/30 border border-slate-800/60 rounded-2xl overflow-hidden shadow-sm">
-            <div className="p-5 border-b border-slate-800 bg-slate-950/20">
-              <h4 className="text-sm font-bold text-slate-200 uppercase tracking-wider">
-                Archivos y Carpetas en C:\ <span className="text-slate-500 ml-2 text-xs bg-slate-800 px-2 py-1 rounded-full">{selectedEquipo.files_list?.length || 0} items</span>
-              </h4>
-            </div>
-            <div className="p-0 overflow-x-auto">
-              {selectedEquipo.files_list && selectedEquipo.files_list.length > 0 ? (
-                <table className="w-full text-left border-collapse min-w-[600px]">
-                  <thead>
-                    <tr className="bg-slate-900/60 border-b border-slate-800 text-xs font-bold text-slate-500 uppercase tracking-wider">
-                      <th className="py-3 px-5">Nombre</th>
-                      <th className="py-3 px-5">Tipo</th>
-                      <th className="py-3 px-5">Oculto</th>
-                      <th className="py-3 px-5">Última Modificación</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-800/50 text-sm">
-                    {selectedEquipo.files_list.map((file: FileItem, idx: number) => (
-                      <tr key={idx} className="hover:bg-slate-900/30 transition-colors">
-                        <td className="py-3 px-5 font-medium text-slate-200">{file.name}</td>
-                        <td className="py-3 px-5 text-slate-400">
-                          <span className={`px-2 py-1 rounded-md text-xs ${file.type === 'Folder' ? 'bg-indigo-500/10 text-indigo-400' : 'bg-slate-800 text-slate-300'}`}>
-                            {file.type}
-                          </span>
-                        </td>
-                        <td className="py-3 px-5 text-slate-400">{file.hidden ? 'Sí' : 'No'}</td>
-                        <td className="py-3 px-5 text-slate-400">{file.last_write_time}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              ) : (
-                <div className="p-8 text-center text-slate-500 text-sm">
-                  No se encontraron archivos o no están disponibles.
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
+        <SortableTables 
+          startupPrograms={selectedEquipo.startup_programs} 
+          filesList={selectedEquipo.files_list} 
+        />
       </div>
     </div>
   )
