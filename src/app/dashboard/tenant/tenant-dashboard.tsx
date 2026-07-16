@@ -105,9 +105,9 @@ interface TenantDashboardProps {
 }
 
 export default function TenantDashboard({ initialEquipos, initialApiKeys, initialGroups, tenantName }: TenantDashboardProps) {
-  const [equipos, setEquipos] = useState<Equipo[]>(initialEquipos)
+  const [equipos] = useState<Equipo[]>(initialEquipos)
   const [apiKeys] = useState<ApiKey[]>(initialApiKeys)
-  const [groups, setGroups] = useState<EquipoGroup[]>(initialGroups)
+  const [groups] = useState<EquipoGroup[]>(initialGroups)
   const [activeTab, setActiveTab] = useState<'inventory' | 'groups' | 'agent'>('inventory')
   
   const [searchQuery, setSearchQuery] = useState('')
