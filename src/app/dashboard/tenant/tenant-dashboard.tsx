@@ -109,6 +109,7 @@ export default function TenantDashboard({ initialEquipos, initialApiKeys, initia
   const [apiKeys] = useState<ApiKey[]>(initialApiKeys)
   const [groups] = useState<EquipoGroup[]>(initialGroups)
   const [activeTab, setActiveTab] = useState<'inventory' | 'groups' | 'agent'>('inventory')
+  const [selectedFilterGroup, setSelectedFilterGroup] = useState<string>('all')
   
   const [searchQuery, setSearchQuery] = useState('')
   const router = useRouter()
@@ -166,13 +167,26 @@ export default function TenantDashboard({ initialEquipos, initialApiKeys, initia
   }
 
   // Filters
-  const filteredEquipos = equipos.filter(e => 
-    e.hostname.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    e.processor.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    e.os.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    e.last_user.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    e.serial_number.toLowerCase().includes(searchQuery.toLowerCase())
-  )
+  const filteredEquipos = equipos.filter(e => {
+    // Check group filter
+    if (selectedFilterGroup === 'unassigned') {
+      if (e.group_id) return false
+    } else if (selectedFilterGroup !== 'all') {
+      if (e.group_id !== selectedFilterGroup) return false
+    }
+
+    // Check search query
+    if (searchQuery.trim() === '') return true
+    
+    const query = searchQuery.toLowerCase()
+    return (
+      e.hostname.toLowerCase().includes(query) ||
+      e.os.toLowerCase().includes(query) ||
+      e.last_user.toLowerCase().includes(query) ||
+      (e.domain || '').toLowerCase().includes(query) ||
+      e.serial_number.toLowerCase().includes(query)
+    )
+  })
 
   // Computations
   const totalComputers = equipos.length
@@ -229,16 +243,6 @@ export default function TenantDashboard({ initialEquipos, initialApiKeys, initia
             }`}
           >
             Inventario
-          </button>
-          <button 
-            onClick={() => setActiveTab('groups')}
-            className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
-              activeTab === 'groups' 
-                ? 'bg-slate-800 text-violet-400 shadow-sm' 
-                : 'text-slate-400 hover:text-slate-300 hover:bg-slate-800/50'
-            }`}
-          >
-            Grupos
           </button>
           <button 
             onClick={() => setActiveTab('agent')}
@@ -361,26 +365,93 @@ export default function TenantDashboard({ initialEquipos, initialApiKeys, initia
         </div>
       )}
 
-      {/* Main Asset Table */}
-      <div className="backdrop-blur-xl bg-slate-900/40 border border-slate-800/80 rounded-2xl p-6 shadow-xl shadow-black/10">
-        
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
-          <div>
-            <h3 className="text-lg font-bold text-slate-200">Equipos de Cómputo</h3>
-            <span className="text-xs text-slate-500">Haz clic en cualquier fila para auditar los componentes físicos a detalle.</span>
-          </div>
-          
-          <div className="relative w-full sm:w-80">
-            <Search className="absolute inset-y-0 left-0 pl-3 h-full w-5 text-slate-500 flex items-center justify-center pointer-events-none" />
-            <input
-              type="text"
-              placeholder="Filtrar por Hostname, CPU, OS, Usuario..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2.5 bg-slate-950/60 border border-slate-800 rounded-xl text-slate-200 placeholder-slate-500 focus:outline-none focus:border-violet-500 text-xs"
-            />
+      {/* Split view for Groups Sidebar and Main Asset Table */}
+      <div className="flex flex-col md:flex-row gap-6">
+        {/* Sidebar for Groups */}
+        <div className="w-full md:w-64 shrink-0 space-y-4">
+          <div className="backdrop-blur-xl bg-slate-900/40 border border-slate-800/80 rounded-2xl p-4 shadow-sm">
+            <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3 px-2">Filtro por Grupos</h3>
+            <ul className="space-y-1">
+              <li>
+                <button
+                  onClick={() => setSelectedFilterGroup('all')}
+                  className={`w-full text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors flex justify-between items-center ${
+                    selectedFilterGroup === 'all' 
+                      ? 'bg-violet-500/10 text-violet-400 border border-violet-500/20' 
+                      : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+                  }`}
+                >
+                  <span>Todos los equipos</span>
+                  <span className="text-xs bg-slate-800 px-2 py-0.5 rounded-full">{totalComputers}</span>
+                </button>
+              </li>
+              <li>
+                <button
+                  onClick={() => setSelectedFilterGroup('unassigned')}
+                  className={`w-full text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors flex justify-between items-center ${
+                    selectedFilterGroup === 'unassigned' 
+                      ? 'bg-violet-500/10 text-violet-400 border border-violet-500/20' 
+                      : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+                  }`}
+                >
+                  <span>Sin asignar</span>
+                  <span className="text-xs bg-slate-800 px-2 py-0.5 rounded-full">
+                    {equipos.filter(e => !e.group_id).length}
+                  </span>
+                </button>
+              </li>
+              {groups.map(group => {
+                const count = equipos.filter(e => e.group_id === group.id).length
+                return (
+                  <li key={group.id}>
+                    <button
+                      onClick={() => setSelectedFilterGroup(group.id)}
+                      className={`w-full text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors flex justify-between items-center ${
+                        selectedFilterGroup === group.id 
+                          ? 'bg-violet-500/10 text-violet-400 border border-violet-500/20' 
+                          : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+                      }`}
+                    >
+                      <span className="truncate pr-2">{group.name}</span>
+                      <span className="text-xs bg-slate-800 px-2 py-0.5 rounded-full">{count}</span>
+                    </button>
+                  </li>
+                )
+              })}
+            </ul>
+
+            <div className="mt-4 pt-4 border-t border-slate-800">
+              <button
+                onClick={() => setActiveTab('groups')}
+                className="w-full text-left px-3 py-2 rounded-lg text-sm font-medium text-slate-400 hover:text-violet-400 hover:bg-violet-500/10 transition-colors flex items-center gap-2"
+              >
+                <Plus className="h-4 w-4" />
+                Gestión de Grupos
+              </button>
+            </div>
           </div>
         </div>
+
+        {/* Main Asset Table */}
+        <div className="flex-1 backdrop-blur-xl bg-slate-900/40 border border-slate-800/80 rounded-2xl p-6 shadow-xl shadow-black/10">
+          
+          <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4 mb-6">
+            <div>
+              <h3 className="text-lg font-bold text-slate-200">Equipos de Cómputo</h3>
+              <span className="text-xs text-slate-500">Haz clic en cualquier fila para auditar detalles.</span>
+            </div>
+            
+            <div className="relative w-full xl:w-80 shrink-0">
+              <Search className="absolute inset-y-0 left-0 pl-3 h-full w-5 text-slate-500 flex items-center justify-center pointer-events-none" />
+              <input
+                type="text"
+                placeholder="Filtrar por Hostname, CPU, OS..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-10 pr-4 py-2.5 bg-slate-950/60 border border-slate-800 rounded-xl text-slate-200 placeholder-slate-500 focus:outline-none focus:border-violet-500 text-xs"
+              />
+            </div>
+          </div>
 
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
@@ -454,6 +525,7 @@ export default function TenantDashboard({ initialEquipos, initialApiKeys, initia
         </div>
 
       </div>
+        </div>
         </>
       ) : activeTab === 'groups' ? (
         <div className="space-y-6 animate-fade-in">
