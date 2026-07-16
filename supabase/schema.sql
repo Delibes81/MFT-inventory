@@ -26,7 +26,16 @@ create table public.tenant_api_keys (
   created_at timestamptz not null default now()
 );
 
--- 4. Equipos (Computer Equipments) Table
+-- 4. Equipo Groups Table
+create table public.equipo_groups (
+  id uuid primary key default gen_random_uuid(),
+  tenant_id uuid not null references public.tenants(id) on delete cascade,
+  name text not null,
+  description text,
+  created_at timestamptz not null default now()
+);
+
+-- 5. Equipos (Computer Equipments) Table
 create table public.equipos (
   id uuid primary key default gen_random_uuid(),
   tenant_id uuid not null references public.tenants(id) on delete cascade,
@@ -43,6 +52,8 @@ create table public.equipos (
   office_version text,
   files_list jsonb,
   startup_programs jsonb,
+  notes text,
+  group_id uuid references public.equipo_groups(id) on delete set null,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   constraint unique_tenant_hostname_serial unique(tenant_id, hostname, serial_number)
@@ -52,6 +63,7 @@ create table public.equipos (
 alter table public.tenants enable row level security;
 alter table public.profiles enable row level security;
 alter table public.tenant_api_keys enable row level security;
+alter table public.equipo_groups enable row level security;
 alter table public.equipos enable row level security;
 
 -- Helper SQL functions to get current user details
@@ -96,6 +108,19 @@ create policy "Super admins can manage api keys"
 
 create policy "Users can view their tenant's api keys" 
   on public.tenant_api_keys for select 
+  using (tenant_id = public.get_my_tenant_id());
+
+-- Equipo Groups policies
+create policy "Super admins can manage all groups" 
+  on public.equipo_groups for all 
+  using (public.get_my_role() = 'super_admin');
+
+create policy "Users can view their tenant's groups" 
+  on public.equipo_groups for select 
+  using (tenant_id = public.get_my_tenant_id());
+
+create policy "Users can update their tenant's groups" 
+  on public.equipo_groups for all 
   using (tenant_id = public.get_my_tenant_id());
 
 -- Equipos policies

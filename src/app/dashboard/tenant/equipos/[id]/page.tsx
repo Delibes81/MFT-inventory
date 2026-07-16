@@ -16,6 +16,8 @@ import {
   DiskDrive, 
 } from '../../tenant-dashboard'
 import SortableTables from './sortable-tables'
+import EquipoNotes from './equipo-notes'
+import EquipoGroupAssignment from './equipo-group-assignment'
 
 export const dynamic = 'force-dynamic'
 
@@ -51,6 +53,15 @@ export default async function EquipoDetailPage({ params }: { params: { id: strin
   }
 
   const selectedEquipo = equipoData as unknown as Equipo
+
+  // Fetch groups for assignment
+  const { data: groupsData } = await supabase
+    .from('equipo_groups')
+    .select('*')
+    .eq('tenant_id', profile.tenant_id)
+    .order('name', { ascending: true })
+
+  const groups = groupsData || []
 
   return (
     <div className="space-y-8 animate-fade-in pb-12">
@@ -110,6 +121,18 @@ export default async function EquipoDetailPage({ params }: { params: { id: strin
             </span>
           </div>
         </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <EquipoGroupAssignment 
+            equipoId={selectedEquipo.id} 
+            currentGroupId={selectedEquipo.group_id ?? null} 
+            groups={groups} 
+          />
+          {/* Empty div just for spacing on large screens, or we can leave Notes alone */}
+        </div>
+
+        {/* Notes Section */}
+        <EquipoNotes equipoId={selectedEquipo.id} initialNotes={selectedEquipo.notes ?? null} />
 
         {/* Hardware Components Section */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">

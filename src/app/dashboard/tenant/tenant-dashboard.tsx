@@ -17,7 +17,7 @@ import {
   Trash2,
   Download
 } from 'lucide-react'
-import { generateTenantApiKey, deleteTenantApiKey } from './actions'
+import { generateTenantApiKey, deleteTenantApiKey, createEquipoGroup, deleteEquipoGroup } from './actions'
 
 export interface RAMModule {
   capacity_gb: number
@@ -68,6 +68,13 @@ export interface StartupProgram {
   user: string
 }
 
+export interface EquipoGroup {
+  id: string
+  name: string
+  description: string | null
+  created_at: string
+}
+
 export interface Equipo {
   id: string
   hostname: string
@@ -84,19 +91,24 @@ export interface Equipo {
   office_version: string | null
   files_list?: FileItem[] | null
   startup_programs?: StartupProgram[] | null
+  notes?: string | null
+  group_id?: string | null
+  equipo_groups?: EquipoGroup | null
   updated_at: string
 }
 
 interface TenantDashboardProps {
   initialEquipos: Equipo[]
   initialApiKeys: ApiKey[]
+  initialGroups: EquipoGroup[]
   tenantName: string
 }
 
-export default function TenantDashboard({ initialEquipos, initialApiKeys, tenantName }: TenantDashboardProps) {
-  const [equipos] = useState<Equipo[]>(initialEquipos)
+export default function TenantDashboard({ initialEquipos, initialApiKeys, initialGroups, tenantName }: TenantDashboardProps) {
+  const [equipos, setEquipos] = useState<Equipo[]>(initialEquipos)
   const [apiKeys] = useState<ApiKey[]>(initialApiKeys)
-  const [activeTab, setActiveTab] = useState<'inventory' | 'agent'>('inventory')
+  const [groups, setGroups] = useState<EquipoGroup[]>(initialGroups)
+  const [activeTab, setActiveTab] = useState<'inventory' | 'groups' | 'agent'>('inventory')
   
   const [searchQuery, setSearchQuery] = useState('')
   const router = useRouter()
@@ -106,6 +118,12 @@ export default function TenantDashboard({ initialEquipos, initialApiKeys, tenant
   const [newKeyName, setNewKeyName] = useState('')
   const [copiedKeyId, setCopiedKeyId] = useState<string | null>(null)
   const formRef = useRef<HTMLFormElement>(null)
+
+  // Group state
+  const [isCreatingGroup, setIsCreatingGroup] = useState(false)
+  const [newGroupName, setNewGroupName] = useState('')
+  const [newGroupDesc, setNewGroupDesc] = useState('')
+  const groupFormRef = useRef<HTMLFormElement>(null)
 
   // Copy to clipboard helper
   const handleCopy = (token: string, id: string) => {
@@ -211,6 +229,16 @@ export default function TenantDashboard({ initialEquipos, initialApiKeys, tenant
             }`}
           >
             Inventario
+          </button>
+          <button 
+            onClick={() => setActiveTab('groups')}
+            className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
+              activeTab === 'groups' 
+                ? 'bg-slate-800 text-violet-400 shadow-sm' 
+                : 'text-slate-400 hover:text-slate-300 hover:bg-slate-800/50'
+            }`}
+          >
+            Grupos
           </button>
           <button 
             onClick={() => setActiveTab('agent')}
@@ -359,6 +387,7 @@ export default function TenantDashboard({ initialEquipos, initialApiKeys, tenant
             <thead>
               <tr className="border-b border-slate-800 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
                 <th className="pb-3 pl-2">Equipo (Hostname)</th>
+                <th className="pb-3">Grupo</th>
                 <th className="pb-3">Sistema Operativo</th>
                 <th className="pb-3">Procesador</th>
                 <th className="pb-3 text-center">RAM</th>
@@ -370,7 +399,7 @@ export default function TenantDashboard({ initialEquipos, initialApiKeys, tenant
             <tbody className="divide-y divide-slate-850 text-sm">
               {filteredEquipos.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="py-8 text-center text-slate-500">
+                  <td colSpan={8} className="py-8 text-center text-slate-500">
                     No se encontraron computadoras registradas.
                   </td>
                 </tr>
@@ -383,6 +412,15 @@ export default function TenantDashboard({ initialEquipos, initialApiKeys, tenant
                   >
                     <td className="py-4 pl-2 font-bold text-slate-200 group-hover:text-violet-400 transition-colors">
                       {e.hostname}
+                    </td>
+                    <td className="py-4 text-xs text-slate-300">
+                      {e.equipo_groups ? (
+                        <span className="bg-slate-800 text-slate-300 px-2.5 py-1 rounded-md text-[11px] font-medium border border-slate-700 whitespace-nowrap">
+                          {e.equipo_groups.name}
+                        </span>
+                      ) : (
+                        <span className="text-slate-500 italic text-[11px]">Sin asignar</span>
+                      )}
                     </td>
                     <td className="py-4 text-xs text-slate-300">{e.os}</td>
                     <td className="py-4 text-xs text-slate-400 max-w-[180px] truncate" title={e.processor}>
@@ -417,6 +455,109 @@ export default function TenantDashboard({ initialEquipos, initialApiKeys, tenant
 
       </div>
         </>
+      ) : activeTab === 'groups' ? (
+        <div className="space-y-6 animate-fade-in">
+          
+          <div className="backdrop-blur-xl bg-slate-900/40 border border-slate-800/80 rounded-2xl p-6 lg:w-3/4 shadow-xl shadow-black/10">
+            <h3 className="text-lg font-bold text-slate-200 mb-2">Administrar Grupos</h3>
+            <p className="text-sm text-slate-400 mb-6">
+              Crea grupos para organizar tus equipos de cómputo (ej. Sede Sur, Marketing, Servidores).
+            </p>
+
+            <form 
+              ref={groupFormRef}
+              action={async (formData) => {
+                setIsCreatingGroup(true)
+                const res = await createEquipoGroup(
+                  formData.get('name') as string,
+                  formData.get('description') as string
+                )
+                setIsCreatingGroup(false)
+                if (res?.error) {
+                  alert(res.error)
+                } else {
+                  setNewGroupName('')
+                  setNewGroupDesc('')
+                  groupFormRef.current?.reset()
+                }
+              }} 
+              className="flex flex-col sm:flex-row gap-3 mb-8"
+            >
+              <input
+                type="text"
+                name="name"
+                placeholder="Nombre del Grupo"
+                value={newGroupName}
+                onChange={(e) => setNewGroupName(e.target.value)}
+                className="flex-1 px-4 py-2.5 bg-slate-950/60 border border-slate-800 rounded-xl text-slate-200 placeholder-slate-500 focus:outline-none focus:border-violet-500 text-sm"
+                required
+              />
+              <input
+                type="text"
+                name="description"
+                placeholder="Descripción (Opcional)"
+                value={newGroupDesc}
+                onChange={(e) => setNewGroupDesc(e.target.value)}
+                className="flex-1 px-4 py-2.5 bg-slate-950/60 border border-slate-800 rounded-xl text-slate-200 placeholder-slate-500 focus:outline-none focus:border-violet-500 text-sm"
+              />
+              <button 
+                type="submit" 
+                disabled={isCreatingGroup}
+                className="px-4 py-2.5 bg-violet-600 hover:bg-violet-500 text-white text-sm font-semibold rounded-xl flex items-center justify-center gap-2 transition-colors disabled:opacity-50"
+              >
+                {isCreatingGroup ? (
+                  <Activity className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Plus className="h-4 w-4" />
+                )}
+                Crear Grupo
+              </button>
+            </form>
+
+            <h4 className="text-sm font-semibold text-slate-300 mb-4">Grupos Existentes</h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {groups.length === 0 ? (
+                <p className="text-sm text-slate-500 italic col-span-2">No has creado ningún grupo todavía.</p>
+              ) : (
+                groups.map(group => {
+                  const count = equipos.filter(e => e.group_id === group.id).length
+                  return (
+                    <div key={group.id} className="bg-slate-950/40 border border-slate-800 p-5 rounded-xl flex flex-col justify-between group-hover:border-violet-500/50 transition-colors">
+                      <div>
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="font-bold text-slate-200 text-base">{group.name}</span>
+                          <form action={async () => {
+                            if(confirm(`¿Eliminar el grupo "${group.name}"? Los equipos en este grupo pasarán a estar "Sin asignar".`)) {
+                              await deleteEquipoGroup(group.id)
+                            }
+                          }}>
+                            <button
+                              type="submit"
+                              className="p-1.5 text-rose-400/50 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-colors"
+                              title="Eliminar grupo"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </form>
+                        </div>
+                        {group.description && (
+                          <p className="text-xs text-slate-400 mb-4 line-clamp-2">{group.description}</p>
+                        )}
+                      </div>
+                      
+                      <div className="flex items-center justify-between mt-4 pt-4 border-t border-slate-800/50">
+                        <span className="text-xs font-semibold text-slate-500 flex items-center gap-1.5">
+                          <Monitor className="h-3.5 w-3.5" />
+                          {count} {count === 1 ? 'equipo asignado' : 'equipos asignados'}
+                        </span>
+                      </div>
+                    </div>
+                  )
+                })
+              )}
+            </div>
+          </div>
+        </div>
       ) : (
         /* Agent Tab Content */
         <div className="space-y-6 animate-fade-in">

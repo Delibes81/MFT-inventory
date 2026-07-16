@@ -27,10 +27,10 @@ export default async function TenantPage() {
   const tenantId = profile.tenant_id
   const tenantName = (profile.tenants as unknown as { name: string })?.name || 'Mi Inquilino'
 
-  // Fetch computers (equipos) for this tenant
+  // Fetch computers (equipos) for this tenant with their groups
   const { data: equiposData, error: equiposError } = await supabase
     .from('equipos')
-    .select('*')
+    .select('*, equipo_groups(*)')
     .eq('tenant_id', tenantId)
     .order('updated_at', { ascending: false })
 
@@ -39,6 +39,19 @@ export default async function TenantPage() {
   }
 
   const equipos = equiposData || []
+
+  // Fetch groups
+  const { data: groupsData, error: groupsError } = await supabase
+    .from('equipo_groups')
+    .select('*')
+    .eq('tenant_id', tenantId)
+    .order('name', { ascending: true })
+
+  if (groupsError) {
+    console.error('Error fetching groups for tenant:', groupsError.message)
+  }
+
+  const groups = groupsData || []
 
   // Fetch API keys for this tenant
   const { data: keysData, error: keysError } = await supabase
@@ -57,6 +70,7 @@ export default async function TenantPage() {
     <TenantDashboard 
       initialEquipos={equipos as unknown as Equipo[]} 
       initialApiKeys={apiKeys}
+      initialGroups={groups}
       tenantName={tenantName} 
     />
   )
