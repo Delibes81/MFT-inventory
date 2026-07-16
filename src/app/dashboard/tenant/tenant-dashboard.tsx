@@ -123,7 +123,6 @@ export default function TenantDashboard({ initialEquipos, initialApiKeys, initia
   // Group state
   const [isCreatingGroup, setIsCreatingGroup] = useState(false)
   const [newGroupName, setNewGroupName] = useState('')
-  const [newGroupDesc, setNewGroupDesc] = useState('')
   const groupFormRef = useRef<HTMLFormElement>(null)
 
   // Copy to clipboard helper
@@ -403,10 +402,10 @@ export default function TenantDashboard({ initialEquipos, initialApiKeys, initia
               {groups.map(group => {
                 const count = equipos.filter(e => e.group_id === group.id).length
                 return (
-                  <li key={group.id}>
+                  <li key={group.id} className="flex items-center gap-1 group/item">
                     <button
                       onClick={() => setSelectedFilterGroup(group.id)}
-                      className={`w-full text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors flex justify-between items-center ${
+                      className={`flex-1 w-full text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors flex justify-between items-center ${
                         selectedFilterGroup === group.id 
                           ? 'bg-violet-500/10 text-violet-400 border border-violet-500/20' 
                           : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
@@ -415,19 +414,84 @@ export default function TenantDashboard({ initialEquipos, initialApiKeys, initia
                       <span className="truncate pr-2">{group.name}</span>
                       <span className="text-xs bg-slate-800 px-2 py-0.5 rounded-full">{count}</span>
                     </button>
+                    <button
+                      onClick={async (e) => {
+                        e.stopPropagation()
+                        if (confirm(`¿Estás seguro de eliminar el grupo "${group.name}"? Los equipos volverán a estar "Sin asignar".`)) {
+                          const res = await deleteEquipoGroup(group.id)
+                          if (res?.error) alert(res.error)
+                          if (selectedFilterGroup === group.id) setSelectedFilterGroup('all')
+                        }
+                      }}
+                      className="opacity-0 group-hover/item:opacity-100 p-2 text-slate-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-all flex-shrink-0"
+                      title="Eliminar grupo"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
                   </li>
                 )
               })}
             </ul>
 
             <div className="mt-4 pt-4 border-t border-slate-800">
-              <button
-                onClick={() => setActiveTab('groups')}
-                className="w-full text-left px-3 py-2 rounded-lg text-sm font-medium text-slate-400 hover:text-violet-400 hover:bg-violet-500/10 transition-colors flex items-center gap-2"
-              >
-                <Plus className="h-4 w-4" />
-                Gestión de Grupos
-              </button>
+              {isCreatingGroup ? (
+                <form
+                  ref={groupFormRef}
+                  action={async (formData) => {
+                    setIsCreatingGroup(true)
+                    const res = await createEquipoGroup(
+                      formData.get('name') as string,
+                      formData.get('description') as string
+                    )
+                    if (res?.error) {
+                      alert(res.error)
+                      setIsCreatingGroup(false)
+                    } else {
+                      setNewGroupName('')
+                      setIsCreatingGroup(false)
+                      groupFormRef.current?.reset()
+                    }
+                  }}
+                  className="space-y-2 animate-fade-in"
+                >
+                  <input
+                    type="text"
+                    name="name"
+                    placeholder="Nombre del Grupo"
+                    value={newGroupName}
+                    onChange={(e) => setNewGroupName(e.target.value)}
+                    className="w-full px-3 py-2 bg-slate-950/60 border border-slate-800 rounded-lg text-slate-200 placeholder-slate-500 focus:outline-none focus:border-violet-500 text-xs"
+                    required
+                  />
+                  <div className="flex gap-2">
+                    <button
+                      type="submit"
+                      disabled={!newGroupName.trim()}
+                      className="flex-1 py-2 bg-violet-600 hover:bg-violet-500 text-white text-xs font-semibold rounded-lg transition-colors disabled:opacity-50"
+                    >
+                      Guardar
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsCreatingGroup(false)
+                        setNewGroupName('')
+                      }}
+                      className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-lg transition-colors"
+                    >
+                      Cancelar
+                    </button>
+                  </div>
+                </form>
+              ) : (
+                <button
+                  onClick={() => setIsCreatingGroup(true)}
+                  className="w-full text-left px-3 py-2 rounded-lg text-sm font-medium text-slate-400 hover:text-violet-400 hover:bg-violet-500/10 transition-colors flex items-center gap-2"
+                >
+                  <Plus className="h-4 w-4" />
+                  Crear Nuevo Grupo
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -527,109 +591,6 @@ export default function TenantDashboard({ initialEquipos, initialApiKeys, initia
       </div>
         </div>
         </>
-      ) : activeTab === 'groups' ? (
-        <div className="space-y-6 animate-fade-in">
-          
-          <div className="backdrop-blur-xl bg-slate-900/40 border border-slate-800/80 rounded-2xl p-6 lg:w-3/4 shadow-xl shadow-black/10">
-            <h3 className="text-lg font-bold text-slate-200 mb-2">Administrar Grupos</h3>
-            <p className="text-sm text-slate-400 mb-6">
-              Crea grupos para organizar tus equipos de cómputo (ej. Sede Sur, Marketing, Servidores).
-            </p>
-
-            <form 
-              ref={groupFormRef}
-              action={async (formData) => {
-                setIsCreatingGroup(true)
-                const res = await createEquipoGroup(
-                  formData.get('name') as string,
-                  formData.get('description') as string
-                )
-                setIsCreatingGroup(false)
-                if (res?.error) {
-                  alert(res.error)
-                } else {
-                  setNewGroupName('')
-                  setNewGroupDesc('')
-                  groupFormRef.current?.reset()
-                }
-              }} 
-              className="flex flex-col sm:flex-row gap-3 mb-8"
-            >
-              <input
-                type="text"
-                name="name"
-                placeholder="Nombre del Grupo"
-                value={newGroupName}
-                onChange={(e) => setNewGroupName(e.target.value)}
-                className="flex-1 px-4 py-2.5 bg-slate-950/60 border border-slate-800 rounded-xl text-slate-200 placeholder-slate-500 focus:outline-none focus:border-violet-500 text-sm"
-                required
-              />
-              <input
-                type="text"
-                name="description"
-                placeholder="Descripción (Opcional)"
-                value={newGroupDesc}
-                onChange={(e) => setNewGroupDesc(e.target.value)}
-                className="flex-1 px-4 py-2.5 bg-slate-950/60 border border-slate-800 rounded-xl text-slate-200 placeholder-slate-500 focus:outline-none focus:border-violet-500 text-sm"
-              />
-              <button 
-                type="submit" 
-                disabled={isCreatingGroup}
-                className="px-4 py-2.5 bg-violet-600 hover:bg-violet-500 text-white text-sm font-semibold rounded-xl flex items-center justify-center gap-2 transition-colors disabled:opacity-50"
-              >
-                {isCreatingGroup ? (
-                  <Activity className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Plus className="h-4 w-4" />
-                )}
-                Crear Grupo
-              </button>
-            </form>
-
-            <h4 className="text-sm font-semibold text-slate-300 mb-4">Grupos Existentes</h4>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {groups.length === 0 ? (
-                <p className="text-sm text-slate-500 italic col-span-2">No has creado ningún grupo todavía.</p>
-              ) : (
-                groups.map(group => {
-                  const count = equipos.filter(e => e.group_id === group.id).length
-                  return (
-                    <div key={group.id} className="bg-slate-950/40 border border-slate-800 p-5 rounded-xl flex flex-col justify-between group-hover:border-violet-500/50 transition-colors">
-                      <div>
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="font-bold text-slate-200 text-base">{group.name}</span>
-                          <form action={async () => {
-                            if(confirm(`¿Eliminar el grupo "${group.name}"? Los equipos en este grupo pasarán a estar "Sin asignar".`)) {
-                              await deleteEquipoGroup(group.id)
-                            }
-                          }}>
-                            <button
-                              type="submit"
-                              className="p-1.5 text-rose-400/50 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-colors"
-                              title="Eliminar grupo"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </button>
-                          </form>
-                        </div>
-                        {group.description && (
-                          <p className="text-xs text-slate-400 mb-4 line-clamp-2">{group.description}</p>
-                        )}
-                      </div>
-                      
-                      <div className="flex items-center justify-between mt-4 pt-4 border-t border-slate-800/50">
-                        <span className="text-xs font-semibold text-slate-500 flex items-center gap-1.5">
-                          <Monitor className="h-3.5 w-3.5" />
-                          {count} {count === 1 ? 'equipo asignado' : 'equipos asignados'}
-                        </span>
-                      </div>
-                    </div>
-                  )
-                })
-              )}
-            </div>
-          </div>
-        </div>
       ) : (
         /* Agent Tab Content */
         <div className="space-y-6 animate-fade-in">
