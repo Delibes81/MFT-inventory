@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/utils/supabase/server'
 import { signOut } from './actions'
-import { Monitor, Building2, LogOut, ShieldAlert, Cpu } from 'lucide-react'
+import { Monitor, Building2, LogOut, ShieldAlert, Cpu, FolderTree } from 'lucide-react'
 
 export default async function DashboardLayout({
   children,
@@ -90,6 +90,13 @@ export default async function DashboardLayout({
               >
                 <Monitor className="h-4 w-4 text-slate-400 group-hover:text-indigo-400 transition-colors" />
                 Mis Equipos
+              </a>
+              <a
+                href="/dashboard/tenant/groups"
+                className="flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-slate-300 hover:text-white hover:bg-slate-900 rounded-xl transition-all duration-150 group"
+              >
+                <FolderTree className="h-4 w-4 text-slate-400 group-hover:text-teal-400 transition-colors" />
+                Gestor de Grupos
               </a>
             </>
           )}

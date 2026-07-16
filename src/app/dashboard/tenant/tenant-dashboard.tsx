@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef } from 'react'
+import { useState, useRef, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { 
   Monitor, 
@@ -17,7 +17,7 @@ import {
   Trash2,
   Download
 } from 'lucide-react'
-import { generateTenantApiKey, deleteTenantApiKey, createEquipoGroup, deleteEquipoGroup } from './actions'
+import { generateTenantApiKey, deleteTenantApiKey } from './actions'
 
 export interface RAMModule {
   capacity_gb: number
@@ -100,16 +100,13 @@ export interface Equipo {
 interface TenantDashboardProps {
   initialEquipos: Equipo[]
   initialApiKeys: ApiKey[]
-  initialGroups: EquipoGroup[]
   tenantName: string
 }
 
-export default function TenantDashboard({ initialEquipos, initialApiKeys, initialGroups, tenantName }: TenantDashboardProps) {
+export default function TenantDashboard({ initialEquipos, initialApiKeys, tenantName }: TenantDashboardProps) {
   const [equipos] = useState<Equipo[]>(initialEquipos)
   const [apiKeys] = useState<ApiKey[]>(initialApiKeys)
-  const [groups] = useState<EquipoGroup[]>(initialGroups)
-  const [activeTab, setActiveTab] = useState<'inventory' | 'groups' | 'agent'>('inventory')
-  const [selectedFilterGroup, setSelectedFilterGroup] = useState<string>('all')
+  const [activeTab, setActiveTab] = useState<'inventory' | 'agent'>('inventory')
   
   const [searchQuery, setSearchQuery] = useState('')
   const router = useRouter()
@@ -120,10 +117,6 @@ export default function TenantDashboard({ initialEquipos, initialApiKeys, initia
   const [copiedKeyId, setCopiedKeyId] = useState<string | null>(null)
   const formRef = useRef<HTMLFormElement>(null)
 
-  // Group state
-  const [isCreatingGroup, setIsCreatingGroup] = useState(false)
-  const [newGroupName, setNewGroupName] = useState('')
-  const groupFormRef = useRef<HTMLFormElement>(null)
 
   // Copy to clipboard helper
   const handleCopy = (token: string, id: string) => {
@@ -166,63 +159,68 @@ export default function TenantDashboard({ initialEquipos, initialApiKeys, initia
   }
 
   // Filters
-  const filteredEquipos = equipos.filter(e => {
-    // Check group filter
-    if (selectedFilterGroup === 'unassigned') {
-      if (e.group_id) return false
-    } else if (selectedFilterGroup !== 'all') {
-      if (e.group_id !== selectedFilterGroup) return false
-    }
-
-    // Check search query
-    if (searchQuery.trim() === '') return true
-    
-    const query = searchQuery.toLowerCase()
-    return (
-      e.hostname.toLowerCase().includes(query) ||
-      e.os.toLowerCase().includes(query) ||
-      e.last_user.toLowerCase().includes(query) ||
-      (e.domain || '').toLowerCase().includes(query) ||
-      e.serial_number.toLowerCase().includes(query)
-    )
-  })
+  const filteredEquipos = useMemo(() => {
+    return equipos.filter(e => {
+      if (searchQuery.trim() === '') return true
+      
+      const query = searchQuery.toLowerCase()
+      return (
+        e.hostname.toLowerCase().includes(query) ||
+        e.os.toLowerCase().includes(query) ||
+        e.last_user.toLowerCase().includes(query) ||
+        (e.domain || '').toLowerCase().includes(query) ||
+        e.serial_number.toLowerCase().includes(query)
+      )
+    })
+  }, [equipos, searchQuery])
 
   // Computations
-  const totalComputers = equipos.length
-  
-  const avgRam = totalComputers > 0 
-    ? Math.round(equipos.reduce((acc, e) => acc + (e.ram_details?.total_gb || 0), 0) / totalComputers)
-    : 0
-
-  const totalStorage = totalComputers > 0
-    ? equipos.reduce((acc, e) => acc + (e.disk_details?.total_gb || 0), 0)
-    : 0
-
-  // OS Distribution calculation
-  const osCount: { [key: string]: number } = {}
-  equipos.forEach(e => {
-    let cleanOs = 'Otros'
-    if (e.os.toLowerCase().includes('windows 11')) cleanOs = 'Windows 11'
-    else if (e.os.toLowerCase().includes('windows 10')) cleanOs = 'Windows 10'
-    else if (e.os.toLowerCase().includes('server')) cleanOs = 'Windows Server'
-    else if (e.os.toLowerCase().includes('linux')) cleanOs = 'Linux'
-    else if (e.os.toLowerCase().includes('mac') || e.os.toLowerCase().includes('os x')) cleanOs = 'macOS'
+  const stats = useMemo(() => {
+    const totalComputers = filteredEquipos.length
     
-    osCount[cleanOs] = (osCount[cleanOs] || 0) + 1
-  })
+    const avgRam = totalComputers > 0 
+      ? Math.round(filteredEquipos.reduce((acc, e) => acc + (e.ram_details?.total_gb || 0), 0) / totalComputers)
+      : 0
+  
+    const totalStorage = totalComputers > 0
+      ? filteredEquipos.reduce((acc, e) => acc + (e.disk_details?.total_gb || 0), 0)
+      : 0
+  
+    // OS Distribution calculation
+    const osCount: { [key: string]: number } = {}
+    // RAM Distribution calculation
+    const ramCount: { [key: string]: number } = { '8 GB o menos': 0, '16 GB': 0, '32 GB': 0, '64 GB o más': 0 }
+    
+    filteredEquipos.forEach(e => {
+      // OS
+      let cleanOs = 'Otros'
+      if (e.os.toLowerCase().includes('windows 11')) cleanOs = 'Windows 11'
+      else if (e.os.toLowerCase().includes('windows 10')) cleanOs = 'Windows 10'
+      else if (e.os.toLowerCase().includes('server')) cleanOs = 'Windows Server'
+      else if (e.os.toLowerCase().includes('linux')) cleanOs = 'Linux'
+      else if (e.os.toLowerCase().includes('mac') || e.os.toLowerCase().includes('os x')) cleanOs = 'macOS'
+      
+      osCount[cleanOs] = (osCount[cleanOs] || 0) + 1
 
-  // RAM Distribution calculation
-  const ramCount: { [key: string]: number } = { '8 GB o menos': 0, '16 GB': 0, '32 GB': 0, '64 GB o más': 0 }
-  equipos.forEach(e => {
-    const total = e.ram_details?.total_gb || 0
-    if (total <= 8) ramCount['8 GB o menos']++
-    else if (total <= 16) ramCount['16 GB']++
-    else if (total <= 32) ramCount['32 GB']++
-    else ramCount['64 GB o más']++
-  })
+      // RAM
+      const total = e.ram_details?.total_gb || 0
+      if (total <= 8) ramCount['8 GB o menos']++
+      else if (total <= 16) ramCount['16 GB']++
+      else if (total <= 32) ramCount['32 GB']++
+      else ramCount['64 GB o más']++
+    })
+
+    return { totalComputers, avgRam, totalStorage, osCount, ramCount }
+  }, [filteredEquipos])
+
+  const { totalComputers, avgRam, totalStorage, osCount, ramCount } = stats
 
   return (
-    <div className="space-y-8">
+    <div className="flex flex-col xl:flex-row gap-6 items-start">
+
+
+      {/* Main Content Area */}
+      <div className="flex-1 space-y-8 min-w-0">
       {/* Page Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-slate-900 pb-6">
         <div>
@@ -364,137 +362,7 @@ export default function TenantDashboard({ initialEquipos, initialApiKeys, initia
         </div>
       )}
 
-      {/* Split view for Groups Sidebar and Main Asset Table */}
-      <div className="flex flex-col md:flex-row gap-6">
-        {/* Sidebar for Groups */}
-        <div className="w-full md:w-64 shrink-0 space-y-4">
-          <div className="backdrop-blur-xl bg-slate-900/40 border border-slate-800/80 rounded-2xl p-4 shadow-sm">
-            <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3 px-2">Filtro por Grupos</h3>
-            <ul className="space-y-1">
-              <li>
-                <button
-                  onClick={() => setSelectedFilterGroup('all')}
-                  className={`w-full text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors flex justify-between items-center ${
-                    selectedFilterGroup === 'all' 
-                      ? 'bg-violet-500/10 text-violet-400 border border-violet-500/20' 
-                      : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
-                  }`}
-                >
-                  <span>Todos los equipos</span>
-                  <span className="text-xs bg-slate-800 px-2 py-0.5 rounded-full">{totalComputers}</span>
-                </button>
-              </li>
-              <li>
-                <button
-                  onClick={() => setSelectedFilterGroup('unassigned')}
-                  className={`w-full text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors flex justify-between items-center ${
-                    selectedFilterGroup === 'unassigned' 
-                      ? 'bg-violet-500/10 text-violet-400 border border-violet-500/20' 
-                      : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
-                  }`}
-                >
-                  <span>Sin asignar</span>
-                  <span className="text-xs bg-slate-800 px-2 py-0.5 rounded-full">
-                    {equipos.filter(e => !e.group_id).length}
-                  </span>
-                </button>
-              </li>
-              {groups.map(group => {
-                const count = equipos.filter(e => e.group_id === group.id).length
-                return (
-                  <li key={group.id} className="flex items-center gap-1 group/item">
-                    <button
-                      onClick={() => setSelectedFilterGroup(group.id)}
-                      className={`flex-1 w-full text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors flex justify-between items-center ${
-                        selectedFilterGroup === group.id 
-                          ? 'bg-violet-500/10 text-violet-400 border border-violet-500/20' 
-                          : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
-                      }`}
-                    >
-                      <span className="truncate pr-2">{group.name}</span>
-                      <span className="text-xs bg-slate-800 px-2 py-0.5 rounded-full">{count}</span>
-                    </button>
-                    <button
-                      onClick={async (e) => {
-                        e.stopPropagation()
-                        if (confirm(`¿Estás seguro de eliminar el grupo "${group.name}"? Los equipos volverán a estar "Sin asignar".`)) {
-                          const res = await deleteEquipoGroup(group.id)
-                          if (res?.error) alert(res.error)
-                          if (selectedFilterGroup === group.id) setSelectedFilterGroup('all')
-                        }
-                      }}
-                      className="opacity-0 group-hover/item:opacity-100 p-2 text-slate-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-all flex-shrink-0"
-                      title="Eliminar grupo"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
-                  </li>
-                )
-              })}
-            </ul>
-
-            <div className="mt-4 pt-4 border-t border-slate-800">
-              {isCreatingGroup ? (
-                <form
-                  ref={groupFormRef}
-                  action={async (formData) => {
-                    setIsCreatingGroup(true)
-                    const res = await createEquipoGroup(
-                      formData.get('name') as string,
-                      formData.get('description') as string
-                    )
-                    if (res?.error) {
-                      alert(res.error)
-                      setIsCreatingGroup(false)
-                    } else {
-                      setNewGroupName('')
-                      setIsCreatingGroup(false)
-                      groupFormRef.current?.reset()
-                    }
-                  }}
-                  className="space-y-2 animate-fade-in"
-                >
-                  <input
-                    type="text"
-                    name="name"
-                    placeholder="Nombre del Grupo"
-                    value={newGroupName}
-                    onChange={(e) => setNewGroupName(e.target.value)}
-                    className="w-full px-3 py-2 bg-slate-950/60 border border-slate-800 rounded-lg text-slate-200 placeholder-slate-500 focus:outline-none focus:border-violet-500 text-xs"
-                    required
-                  />
-                  <div className="flex gap-2">
-                    <button
-                      type="submit"
-                      disabled={!newGroupName.trim()}
-                      className="flex-1 py-2 bg-violet-600 hover:bg-violet-500 text-white text-xs font-semibold rounded-lg transition-colors disabled:opacity-50"
-                    >
-                      Guardar
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setIsCreatingGroup(false)
-                        setNewGroupName('')
-                      }}
-                      className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-lg transition-colors"
-                    >
-                      Cancelar
-                    </button>
-                  </div>
-                </form>
-              ) : (
-                <button
-                  onClick={() => setIsCreatingGroup(true)}
-                  className="w-full text-left px-3 py-2 rounded-lg text-sm font-medium text-slate-400 hover:text-violet-400 hover:bg-violet-500/10 transition-colors flex items-center gap-2"
-                >
-                  <Plus className="h-4 w-4" />
-                  Crear Nuevo Grupo
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
+      {/* Main Asset Table */}
 
         {/* Main Asset Table */}
         <div className="flex-1 backdrop-blur-xl bg-slate-900/40 border border-slate-800/80 rounded-2xl p-6 shadow-xl shadow-black/10">
@@ -587,9 +455,8 @@ export default function TenantDashboard({ initialEquipos, initialApiKeys, initia
             </tbody>
           </table>
         </div>
-
-      </div>
         </div>
+        
         </>
       ) : (
         /* Agent Tab Content */
@@ -708,6 +575,7 @@ export default function TenantDashboard({ initialEquipos, initialApiKeys, initia
           </div>
         </div>
       )}
+      </div>
     </div>
   )
 }

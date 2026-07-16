@@ -1,10 +1,11 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/utils/supabase/server'
-import TenantDashboard, { Equipo } from './tenant-dashboard'
+import GroupsManager from './groups-manager'
+import { Equipo } from '../tenant-dashboard'
 
 export const dynamic = 'force-dynamic'
 
-export default async function TenantPage() {
+export default async function TenantGroupsPage() {
   const supabase = createClient()
   
   const { data: { user } } = await supabase.auth.getUser()
@@ -30,7 +31,7 @@ export default async function TenantPage() {
   // Fetch in parallel
   const [
     { data: equiposData, error: equiposError },
-    { data: keysData, error: keysError }
+    { data: groupsData, error: groupsError }
   ] = await Promise.all([
     supabase
       .from('equipos')
@@ -38,22 +39,22 @@ export default async function TenantPage() {
       .eq('tenant_id', tenantId)
       .order('updated_at', { ascending: false }),
     supabase
-      .from('tenant_api_keys')
+      .from('equipo_groups')
       .select('*')
       .eq('tenant_id', tenantId)
-      .order('created_at', { ascending: false })
+      .order('name', { ascending: true })
   ])
 
   if (equiposError) console.error('Error fetching equipments for tenant:', equiposError.message)
-  if (keysError) console.error('Error fetching api keys for tenant:', keysError.message)
+  if (groupsError) console.error('Error fetching groups for tenant:', groupsError.message)
 
   const equipos = equiposData || []
-  const apiKeys = keysData || []
+  const groups = groupsData || []
 
   return (
-    <TenantDashboard 
+    <GroupsManager 
       initialEquipos={equipos as unknown as Equipo[]} 
-      initialApiKeys={apiKeys}
+      initialGroups={groups}
       tenantName={tenantName} 
     />
   )
