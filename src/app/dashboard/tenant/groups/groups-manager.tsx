@@ -91,7 +91,7 @@ export default function GroupsManager({ initialEquipos, initialGroups, tenantNam
       setIsCreatingGroup(false)
       
       // Update local state instead of full reload for speed
-      if (res.group) {
+      if ('group' in res && res.group) {
         setGroups([...groups, res.group as EquipoGroup])
       } else {
         router.refresh()

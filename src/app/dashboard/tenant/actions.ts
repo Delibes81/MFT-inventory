@@ -134,13 +134,14 @@ export async function createEquipoGroup(name: string, description: string | null
 
   if (!profile || !profile.tenant_id) return { error: 'No autorizado' }
 
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from('equipo_groups')
     .insert({
       tenant_id: profile.tenant_id,
       name: name.trim(),
       description: description?.trim() || null
     })
+    .select()
 
   if (error) {
     console.error('Create equipo group error:', error.message)
@@ -148,7 +149,7 @@ export async function createEquipoGroup(name: string, description: string | null
   }
 
   revalidatePath('/dashboard/tenant')
-  return { success: true }
+  return { success: true, group: data[0] }
 }
 
 export async function deleteEquipoGroup(groupId: string) {
