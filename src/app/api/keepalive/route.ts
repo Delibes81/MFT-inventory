@@ -25,10 +25,10 @@ export async function GET() {
       message: 'Database ping successful', 
       timestamp: new Date().toISOString() 
     })
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Keepalive ping error:', error)
     return NextResponse.json(
-      { status: 'error', message: error?.message || 'Unknown error' },
+      { status: 'error', message: error instanceof Error ? error.message : 'Unknown error' },
       { status: 500 }
     )
   }
